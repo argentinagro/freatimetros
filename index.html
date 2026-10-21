@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Freatímetros Argentinagro</title>
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-180.png">
+<style>
+/* Herramienta de campo: controles grandes, letra del sistema (funciona sin señal), perfil de suelo: tierra arriba, agua abajo. */
+:root{
+  --bg:#f3f1ec;--surface:#fff;--line:#d9d3c7;--fg:#22201b;--muted:#6c665b;
+  --soil:#7a5a3a;--water:#1f6f9e;--water-soft:#d7e8f3;--crop:#3f7a2a;--crop-soft:#e3efd9;--brand:#f2b705;
+  --ok:#2f7d3f;--warn:#b7791f;--bad:#b4372f;--ok-soft:#e1f0e3;--warn-soft:#f6ead2;--bad-soft:#f5dcd9;
+  --font:Roboto,"Segoe UI",system-ui,sans-serif;--mono:"Roboto Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#141311;--surface:#1f1d1a;--line:#3a362f;--fg:#ece8df;--muted:#a39c8f;
+  --soil:#c49a6c;--water:#5fb0e0;--water-soft:#1b3342;--crop:#8cc96b;--crop-soft:#22301b;
+  --ok:#6cc27b;--warn:#e0a84a;--bad:#e8776d;--ok-soft:#1d3322;--warn-soft:#3a2e17;--bad-soft:#3d1f1c;color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:16px;line-height:1.4;
+  padding:0 max(14px,env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
+.wrap{max-width:620px;margin:0 auto}
+header{position:sticky;top:0;z-index:5;background:#000;margin:0 calc(-1*max(14px,env(safe-area-inset-left)));padding:calc(8px + env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) 8px max(14px,env(safe-area-inset-left))}
+.top{display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:620px;margin:0 auto}
+.top img{height:34px;width:auto;display:block;max-width:62%}
+.chip{font-size:12px;padding:4px 9px;border-radius:999px;white-space:nowrap;font-weight:600;background:#333;color:#ddd}
+.chip.on{background:#1d3322;color:#8fe0a0}.chip.off{background:#3a2e17;color:#f2c56b}
+nav{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:8px auto 0;max-width:620px}
+nav button{font:inherit;font-weight:700;border:0;background:#222;color:#bbb;padding:10px 4px;border-radius:8px}
+nav button[aria-selected="true"]{background:var(--brand);color:#000}
+section{padding-top:14px;display:grid;gap:14px}
+h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:700}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:12px}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.opt{font:inherit;font-size:15px;border:1.5px solid var(--line);background:var(--surface);color:var(--fg);border-radius:9px;padding:9px 12px;text-align:left;min-height:46px}
+.opt small{display:block;color:var(--muted);font-size:12px}
+.opt[aria-pressed="true"]{border-color:var(--water);background:var(--water-soft)}
+.pozos{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.pozos .opt{text-align:center;padding:8px 2px;font-family:var(--mono);font-size:14px}
+label.f{display:grid;gap:4px;font-weight:700;font-size:14px}
+label.f .h,.h{font-weight:400;color:var(--muted);font-size:12px}
+input,select,textarea{font:inherit;font-size:17px;padding:11px 12px;border:1.5px solid var(--line);border-radius:9px;background:var(--bg);color:var(--fg);width:100%;min-width:0}
+select{min-height:48px}
+input.num{font-family:var(--mono);font-size:24px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.result{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:12px;border-radius:10px;background:var(--water-soft)}
+.big{font-family:var(--mono);font-size:34px;font-weight:700;color:var(--water)}
+.crop{display:grid;gap:4px;padding:12px;border-radius:10px;background:var(--crop-soft)}
+.crop b{color:var(--crop);font-size:18px}
+.zone{display:inline-block;font-size:13px;font-weight:700;padding:3px 9px;border-radius:999px}
+.z-bad{background:var(--bad-soft);color:var(--bad)}.z-warn{background:var(--warn-soft);color:var(--warn)}.z-ok{background:var(--ok-soft);color:var(--ok)}.z-dry{background:var(--line);color:var(--muted)}
+.btn{font:inherit;font-weight:800;font-size:18px;border:0;border-radius:10px;padding:15px;background:var(--water);color:#fff;width:100%}
+.btn.sec{background:var(--surface);color:var(--fg);border:1.5px solid var(--line);font-size:15px;padding:12px;font-weight:700}
+.btn:disabled{opacity:.45}
+.msg{font-size:14px;padding:10px 12px;border-radius:9px}
+.msg.ok{background:var(--ok-soft);color:var(--ok)}.msg.err{background:var(--bad-soft);color:var(--bad)}.msg.info{background:var(--warn-soft);color:var(--warn)}
+.cards{display:grid;gap:8px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;grid-template-columns:70px 1fr auto;gap:10px;align-items:center;text-align:left;font:inherit;color:inherit;width:100%}
+.card .id{font-family:var(--mono);font-weight:700}.sub,.xs{font-size:12px;color:var(--muted)}
+.card .val{font-family:var(--mono);font-size:20px;font-weight:700;text-align:right}
+.card .d{font-size:12px;text-align:right}.cr{font-size:12px;color:var(--crop);font-weight:700}
+.up{color:var(--bad)}.down{color:var(--ok)}
+.empty{color:var(--muted);font-size:14px;padding:14px;border:1.5px dashed var(--line);border-radius:12px;text-align:center}
+.chart{width:100%;height:auto;display:block}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--muted);font-weight:700;font-size:12px}
+td.n{font-family:var(--mono);text-align:right}
+.legend{display:flex;flex-wrap:wrap;gap:6px;font-size:12px}
+.link{font:inherit;font-size:14px;background:none;border:0;color:var(--water);padding:6px 0;text-decoration:underline;text-align:left}
+.danger{color:var(--bad)}
+.login{min-height:80vh;display:grid;place-items:center}
+.login .panel{width:100%;max-width:380px}
+@media (max-width:370px){.pozos{grid-template-columns:repeat(3,1fr)}.row2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="top"><img src="icons/logo-header.jpg" alt="Argentinagro Asesoramiento Agrícola"><span id="net" class="chip">…</span></div>
+  <nav id="nav" hidden>
+    <button data-v="cargar" aria-selected="true">Cargar</button>
+    <button data-v="pozos" aria-selected="false">Pozos</button>
+    <button data-v="hist" aria-selected="false">Historial</button>
+  </nav>
+</header>
+<div class="wrap">
+
+<!-- INGRESO -->
+<section id="v-login" class="login" hidden>
+  <div class="panel">
+    <h2>Freatímetros · Ingreso</h2>
+    <div class="xs">Se hace una sola vez en este teléfono, con señal.</div>
+    <label class="f">Operador<select id="lg-nombre"><option value="">Cargando nombres…</option></select></label>
+    <label class="f">PIN<input id="lg-pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off"></label>
+    <button class="btn" id="lg-btn">Ingresar</button>
+    <div id="lg-msg" hidden></div>
+  </div>
+</section>
+
+<!-- CARGAR -->
+<section id="v-cargar" hidden>
+  <div id="pendBox" hidden class="msg info"></div>
+  <div class="panel">
+    <h2>1 · Freatímetro</h2>
+    <div class="seg" id="campoSeg"></div>
+    <div class="pozos" id="pozoGrid"></div>
+    <div id="pozoInfo" class="xs"></div>
+    <div id="gpsInfo" class="xs"></div>
+  </div>
+  <div class="panel">
+    <h2>2 · Lectura de napa</h2>
+    <div class="row2">
+      <label class="f">Fecha<input type="date" id="fecha"></label>
+      <label class="f">Hora<input type="time" id="hora"></label>
+    </div>
+    <label class="f">Lectura de la vara (m)
+      <span class="h">Lo que marca la vara de la boya a ras de la boca del caño</span>
+      <input class="num" id="lectura" type="number" inputmode="decimal" step="0.01" min="0" max="20" placeholder="0,00"></label>
+    <div class="xs" id="alturaInfo"></div>
+    <div class="result"><div><div class="xs">Profundidad real de napa</div><div class="big" id="prof">–</div></div><div id="profZone"></div></div>
+    <label class="f">Lluvia desde la última lectura (mm)
+      <span class="h">Pluviómetro del pozo. Vacío si no hay pluviómetro; 0 si no llovió</span>
+      <input class="num" id="lluvia" type="number" inputmode="decimal" step="1" min="0" max="500" placeholder="–"></label>
+  </div>
+  <div class="panel">
+    <h2>3 · Estado del lote</h2>
+    <div id="cultivoActivo" class="crop" hidden></div>
+    <div class="opts" id="estadoOpts"></div>
+    <div id="nuevoCultivo" class="row2" hidden>
+      <label class="f">Cultivo<select id="cultivo"></select></label>
+      <label class="f">Fecha de siembra (FS)<input type="date" id="fs"></label>
+    </div>
+    <details id="addCropBox" hidden>
+      <summary class="link">+ Agregar un cultivo a la lista (ej. cultivo de servicio)</summary>
+      <div style="display:grid;gap:10px;margin-top:10px">
+        <label class="f">Nombre<input id="nc-nombre" placeholder="Ej.: Centeno, Vicia villosa"></label>
+        <label class="f">Escala fenológica<select id="nc-escala"></select></label>
+        <label class="f" style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="nc-serv" style="width:auto" checked> Es cultivo de servicio (suma el estadio "Secado")</label>
+        <button class="btn sec" id="nc-save">Agregar a la lista</button><div id="nc-msg" hidden></div>
+      </div>
+    </details>
+    <label class="f" id="fenoWrap" hidden>Estadio fenológico<span class="h" id="fenoEscala"></span><select id="estadio"></select></label>
+    <label class="f">Malezas<span class="h">Tamaño y cantidad de malezas vivas</span><select id="malezas"></select></label>
+    <label class="f">Verde activo<span class="h">Superficie verde transpirando (malezas o cultivo)</span><select id="verde"></select></label>
+    <label class="f">Cobertura de rastrojo<span class="h">Suelo tapado por residuos secos</span><select id="cob"></select></label>
+    <label class="f">Observaciones<textarea id="obs" rows="2" placeholder="Ej.: caño dañado, agua turbia, bajo anegado"></textarea></label>
+  </div>
+  <div id="formMsg" hidden></div>
+  <div class="xs" id="quien"></div>
+  <button class="btn" id="guardar">Guardar lectura</button>
+</section>
+
+<!-- POZOS -->
+<section id="v-pozos" hidden>
+  <div class="legend">
+    <span class="zone z-bad">&lt; 1 m anegamiento</span><span class="zone z-warn">1–1,5 alta</span>
+    <span class="zone z-ok">1,5–2,5 óptima</span><span class="zone z-warn">2,5–4 aporte bajo</span><span class="zone z-dry">&gt; 4 sin aporte</span>
+  </div>
+  <div id="pozoCards" class="cards"></div>
+  <div id="pozoDetalle" hidden></div>
+</section>
+
+<!-- HISTORIAL -->
+<section id="v-hist" hidden>
+  <div class="seg" id="histFiltro"></div>
+  <div class="panel">
+    <div id="histInfo" class="xs"></div>
+    <button class="btn sec" id="btnSync">Actualizar ahora</button>
+    <button class="btn sec" id="btnCsv">Descargar copia (CSV)</button>
+    <button class="link danger" id="btnSalir">Cerrar sesión en este teléfono</button>
+  </div>
+  <div id="histList"></div>
+</section>
+</div>
+
+<script>
+/* ======= CONFIGURACIÓN ======= */
+const API = "__API_URL__"; // dirección de la aplicación web de Apps Script
+
+/* ======= escalas ======= */
+const ESTADOS=[{id:"barbecho_limpio",t:"Barbecho limpio",s:"Sin malezas"},{id:"barbecho_malezas",t:"Barbecho con malezas",s:"Malezas consumiendo"},{id:"barbecho_seco",t:"Barbecho seco",s:"Rastrojo, sin verde"},{id:"cultivo",t:"Sembrado",s:"Cargar cultivo y FS"}];
+const EST_TXT={barbecho_limpio:"Barbecho limpio",barbecho_malezas:"Barbecho con malezas",barbecho_seco:"Barbecho seco",cultivo:"Con cultivo"};
+const MALEZAS=[[1,"Sin malezas"],[2,"Pocas y chicas (< 5 cm)"],[3,"Muchas chicas, o pocas grandes"],[4,"Muchas grandes (> 15 cm)"],[5,"Enmalezado total"]];
+const VERDE=[[1,"Nada verde (0 %)"],[2,"Muy poco (< 10 %)"],[3,"Poco (10–30 %)"],[4,"Bastante (30–60 %)"],[5,"Mucho (> 60 %)"]];
+const COB=[[1,"Suelo desnudo (< 20 %)"],[2,"Poca (20–40 %)"],[3,"Media (40–60 %)"],[4,"Buena (60–80 %)"],[5,"Total (> 80 %)"]];
+const FENO={
+ "Soja":{escala:"Fehr y Caviness (1977)",e:[["VE","Emergencia"],["VC","Cotiledones abiertos"],["V1","1 nudo"],["V2","2 nudos"],["V3","3 nudos"],["V4","4 nudos"],["V5","5 nudos"],["V6","6 nudos"],["Vn","Más de 6 nudos"],["R1","Inicio de floración"],["R2","Plena floración"],["R3","Inicio formación de vainas"],["R4","Plena formación de vainas"],["R5","Inicio llenado de granos"],["R6","Grano lleno"],["R7","Madurez fisiológica"],["R8","Madurez de cosecha"]]},
+ "Maíz":{escala:"Ritchie y Hanway (1982)",e:[["VE","Emergencia"],["V1","1 hoja con cuello visible"],...Array.from({length:16},(_,i)=>["V"+(i+2),(i+2)+" hojas"]),["V18+","18 hojas o más"],["VT","Panojamiento"],["R1","Emergencia de estigmas"],["R2","Grano en ampolla"],["R3","Grano lechoso"],["R4","Grano pastoso"],["R5","Grano dentado"],["R6","Madurez fisiológica"]]},
+ "Girasol":{escala:"Schneiter y Miller (1981)",e:[["VE","Emergencia"],["V2","2 hojas"],["V4","4 hojas"],["V8","8 hojas"],["V12","12 hojas"],["Vn","Más de 12 hojas"],["R1","Botón floral (estrella)"],["R2","Botón a < 2 cm de la hoja"],["R3","Botón a > 2 cm"],["R4","Inicio apertura"],["R5","Inicio de floración"],["R6","Fin de floración"],["R7","Envés amarillo pálido"],["R8","Envés amarillo, brácteas verdes"],["R9","Madurez fisiológica"]]},
+ "Trigo":{escala:"Zadoks (1974)",e:[["Z10","Emergencia"],["Z12","2 hojas"],["Z13","3 hojas"],["Z21","Inicio macollaje"],["Z23","3 macollos"],["Z25","5 macollos"],["Z30","Inicio encañazón"],["Z31","1.er nudo"],["Z32","2.º nudo"],["Z37","Hoja bandera visible"],["Z39","Lígula hoja bandera"],["Z45","Bota"],["Z49","Aristas visibles"],["Z55","Media espiga"],["Z59","Espigazón completa"],["Z61","Inicio floración"],["Z65","Media floración"],["Z69","Fin floración"],["Z71","Grano acuoso"],["Z75","Grano lechoso"],["Z85","Grano pastoso"],["Z87","Pastoso duro"],["Z92","Madurez de cosecha"]]},
+ "Sorgo":{escala:"Vanderlip y Reeves (1972), vegetativos por hoja",e:[["VE","Emergencia (etapa 0)"],["V1","1 hoja"],["V2","2 hojas"],["V3","3 hojas (etapa 1)"],["V4","4 hojas"],["V5","5 hojas (etapa 2)"],["V6","6 hojas"],["V7","7 hojas"],["V8","8 hojas – diferenciación (etapa 3)"],["V9","9 hojas"],["V10","10 hojas"],["V11","11 hojas"],["V12+","12 hojas o más"],["E4","Hoja bandera visible"],["E5","Bota"],["E6","50 % floración"],["E7","Grano lechoso"],["E8","Grano pastoso"],["E9","Madurez fisiológica"]]},
+ "Algodón":{escala:"Por nudos y estructuras (uso INTA)",e:[["E","Emergencia"],["C","Cotiledonar"],["V2","2 hojas"],["V4","4 hojas"],["V6","6 hojas"],["PP","Primer pimpollo"],["1F","Primera flor blanca"],["PF","Plena floración"],["NAWF5","Corte de floración"],["1CA","Primera cápsula abierta"],["60CA","60 % cápsulas abiertas"],["DEF","Defoliado"]]},
+ "Otro":{escala:"Descriptiva general",e:[["VE","Emergencia"],["V","Vegetativo"],["R-flor","Floración"],["R-llen","Llenado"],["R-mad","Madurez"]]}};
+const ESCALAS_EXTRA={zadoks:{nombre:"Zadoks – gramíneas (centeno, avena, cebada, raigrás)",base:FENO.Trigo},
+ leguminosa:{nombre:"Descriptiva – leguminosas de servicio (vicia, trébol)",base:{escala:"Descriptiva leguminosas de servicio",e:[["E","Emergencia"],["RAM","Ramificación / roseta"],["CA","Crecimiento activo"],["IF","Inicio de floración"],["PF","Plena floración"],["VA","Formación de vainas"]]}},
+ fehr:{nombre:"Fehr y Caviness – leguminosas de grano",base:FENO.Soja},ritchie:{nombre:"Ritchie y Hanway – maíz y similares",base:FENO["Maíz"]},general:{nombre:"Descriptiva general",base:FENO.Otro}};
+
+/* ======= almacenamiento local ======= */
+const LS={get(k,d){try{const v=localStorage.getItem("fr_"+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem("fr_"+k,JSON.stringify(v))}catch(e){}}};
+let ses=LS.get("ses",null), cfg=LS.get("cfg",{pozos:[],cultivos:[],activos:{}}), lecturas=LS.get("lecturas",[]), cola=LS.get("cola",[]);
+const st={campo:"CP",pozo:null,estado:null,view:"cargar",hist:"CP",detalle:null,gps:null,online:navigator.onLine};
+const $=id=>document.getElementById(id);
+const fmt=(n,d=2)=>n==null||n===""||isNaN(n)?"–":Number(n).toFixed(d).replace(".",",");
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fdate=s=>s?String(s).split("-").reverse().join("/"):"–";
+const hoy=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const ahora=()=>{const d=new Date();return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
+const dias=(a,b)=>Math.round((new Date(b+"T12:00")-new Date(a+"T12:00"))/864e5);
+const tsOf=l=>new Date((l.fecha||"1970-01-01")+"T"+(l.hora||"12:00")).getTime();
+function showMsg(id,k,t){const m=$(id);m.hidden=false;m.className="msg "+k;m.textContent=t}
+function zona(p){if(p==null||isNaN(p))return null;if(p<1)return{c:"z-bad",t:"Riesgo anegamiento"};if(p<1.5)return{c:"z-warn",t:"Napa alta"};if(p<=2.5)return{c:"z-ok",t:"Rango óptimo"};if(p<=4)return{c:"z-warn",t:"Aporte bajo"};return{c:"z-dry",t:"Sin aporte"}}
+
+/* ======= servidor ======= */
+async function api(action,data={},auth=true){
+  const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),25000);
+  try{
+    const body={action,...data};if(auth&&ses){body.nombre=ses.nombre;body.token=ses.token}
+    const r=await fetch(API,{method:"POST",body:JSON.stringify(body),signal:ctl.signal,redirect:"follow"});
+    const j=await r.json();
+    if(j&&j.error==="sesion_invalida"){ses=null;LS.set("ses",null);boot();}
+    return j;
+  }finally{clearTimeout(to)}
+}
+let syncing=false;
+async function sincronizar(){
+  if(syncing||!ses)return;syncing=true;renderNet("sync");
+  try{
+    if(cola.length){
+      const r=await api("guardarLecturas",{lecturas:cola});
+      if(r&&r.ok){const ok=new Set(r.guardadas);cola=cola.filter(l=>!ok.has(l.id));LS.set("cola",cola)}
+    }
+    for(const ci of LS.get("cierres",[])){const r=await api("cerrarCultivo",ci);if(r&&r.ok)LS.set("cierres",LS.get("cierres",[]).filter(x=>x.pozoId!==ci.pozoId))}
+    const c=await api("config");if(c&&c.ok)LS.get("cierres",[]).forEach(ci=>{delete c.activos[ci.pozoId]});if(c&&c.ok){cfg={pozos:c.pozos,cultivos:c.cultivos,activos:c.activos};LS.set("cfg",cfg)}
+    const d=await api("datos");if(d&&d.ok){lecturas=d.lecturas;LS.set("lecturas",lecturas);LS.set("ultimaSync",Date.now())}
+    st.online=true;
+  }catch(e){st.online=false}
+  finally{syncing=false;fillCultivoSelect();renderAll();renderNet()}
+}
+window.addEventListener("online",()=>{st.online=true;sincronizar()});
+window.addEventListener("offline",()=>{st.online=false;renderNet()});
+setInterval(()=>{if(cola.length&&navigator.onLine)sincronizar()},60000);
+
+function renderNet(m){
+  const el=$("net"),n=cola.length;
+  if(m==="sync"){el.className="chip";el.textContent="Sincronizando…";}
+  else if(!navigator.onLine||!st.online){el.className="chip off";el.textContent=n?`Sin señal · ${n} sin subir`:"Sin señal";}
+  else{el.className="chip "+(n?"off":"on");el.textContent=n?`${n} sin subir`:"Sincronizado";}
+  const pb=$("pendBox");pb.hidden=!n;
+  if(n)pb.textContent=`${n} lectura${n>1?"s":""} guardada${n>1?"s":""} en este teléfono. Se suben solas cuando haya señal.`;
+}
+
+/* ======= ingreso ======= */
+async function boot(){
+  ["login","cargar","pozos","hist"].forEach(x=>$("v-"+x).hidden=true);
+  if(!ses){
+    $("nav").hidden=true;$("v-login").hidden=false;
+    const cache=LS.get("operadores",[]);fillOps(cache);
+    try{const r=await api("operadores",{},false);if(r&&r.ok){LS.set("operadores",r.operadores);fillOps(r.operadores)}}
+    catch(e){if(!cache.length)$("lg-nombre").innerHTML=`<option value="">Sin señal: conectate para el primer ingreso</option>`}
+    return;
+  }
+  $("nav").hidden=false;$("quien").textContent="Cargando como: "+ses.nombre;
+  setView(st.view);sincronizar();
+}
+function fillOps(l){if(l.length)$("lg-nombre").innerHTML=`<option value="">Elegí tu nombre…</option>`+l.map(n=>`<option>${esc(n)}</option>`).join("")}
+$("lg-btn").onclick=async()=>{
+  const nombre=$("lg-nombre").value,pin=$("lg-pin").value.trim();
+  if(!nombre||!pin){showMsg("lg-msg","err","Elegí tu nombre y escribí el PIN.");return}
+  $("lg-btn").disabled=true;
+  try{const r=await api("login",{nombre,pin},false);
+    if(r&&r.ok){ses={nombre:r.nombre,token:r.token,rol:r.rol};LS.set("ses",ses);$("lg-pin").value="";boot()}
+    else showMsg("lg-msg","err","PIN incorrecto. Probá de nuevo.");
+  }catch(e){showMsg("lg-msg","err","No hay conexión. El primer ingreso necesita señal.")}
+  finally{$("lg-btn").disabled=false}
+};
+$("btnSalir").onclick=()=>{const b=$("btnSalir");if(b.dataset.armed!=="1"){b.dataset.armed="1";b.textContent="Tocá de nuevo para confirmar"+(cola.length?` (hay ${cola.length} lecturas sin subir)`:"");setTimeout(()=>{b.dataset.armed="";b.textContent="Cerrar sesión en este teléfono"},5000);return}
+  ses=null;LS.set("ses",null);boot()};
+
+/* ======= cultivos ======= */
+const isAdmin=()=>ses&&ses.rol==="admin";
+const pozoBy=id=>cfg.pozos.find(p=>p.id===id);
+const extraOf=c=>(cfg.cultivos||[]).find(x=>x.nombre===c);
+function escalaDe(c){if(FENO[c])return FENO[c];const x=extraOf(c);if(!x||!ESCALAS_EXTRA[x.escala])return null;const b=ESCALAS_EXTRA[x.escala].base;return x.servicio?{escala:b.escala,e:[...b.e,["SEC","Secado (químico o rolado)"]]}:b}
+function cropOf(pid){const q=cola.filter(r=>r.pozoId===pid&&r.abreCultivo).pop();if(q)return{cultivo:q.cultivo,fs:q.fs,local:true};
+  if(cola.some(r=>r.pozoId===pid&&r.cierraCultivo))return null;return cfg.activos&&cfg.activos[pid]||null}
+function fillCultivoSelect(){
+  const prev=$("cultivo").value,base=Object.keys(FENO).filter(c=>c!=="Otro"),ex=cfg.cultivos||[];
+  const serv=ex.filter(c=>c.servicio).map(c=>c.nombre),otros=ex.filter(c=>!c.servicio).map(c=>c.nombre);
+  $("cultivo").innerHTML=`<option value="">Elegir…</option><optgroup label="Cultivos de renta">${[...base,...otros].map(c=>`<option>${esc(c)}</option>`).join("")}</optgroup>`+(serv.length?`<optgroup label="Cultivos de servicio">${serv.map(c=>`<option>${esc(c)}</option>`).join("")}</optgroup>`:"")+`<optgroup label="Otros"><option>Otro</option></optgroup>`;
+  if(prev)$("cultivo").value=prev;
+}
+function fillFeno(c){const f=escalaDe(c);if(!f){$("fenoWrap").hidden=true;$("estadio").innerHTML="";return}
+  $("fenoWrap").hidden=false;$("fenoEscala").textContent="Escala "+f.escala;const prev=$("estadio").value;
+  $("estadio").innerHTML=`<option value="">Elegir estadio…</option>`+f.e.map(([k,t])=>`<option value="${k}">${k} – ${esc(t)}</option>`).join("");
+  if(f.e.some(x=>x[0]===prev))$("estadio").value=prev}
+function fillSel(id,arr){$(id).innerHTML=`<option value="">Elegir 1 a 5…</option>`+arr.map(([v,t])=>`<option value="${v}">${v} – ${esc(t)}</option>`).join("")}
+
+/* ======= GPS ======= */
+function distM(a,b,c,d){const R=6371000,r=x=>x*Math.PI/180,dl=r(c-a),dn=r(d-b);const h=Math.sin(dl/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+function tomarGPS(cb){
+  if(!navigator.geolocation){cb&&cb(null);return}
+  navigator.geolocation.getCurrentPosition(p=>{st.gps={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy,t:Date.now()};renderGps();cb&&cb(st.gps)},
+    ()=>{renderGps(true);cb&&cb(null)},{enableHighAccuracy:true,timeout:20000,maximumAge:60000});
+}
+function renderGps(err){
+  const el=$("gpsInfo");if(!st.pozo){el.textContent="";return}
+  if(err&&!st.gps){el.innerHTML=`<span class="danger">📍 No se pudo tomar el GPS. Revisá que la ubicación del teléfono esté activada.</span>`;return}
+  if(!st.gps){el.textContent="📍 Buscando GPS…";return}
+  const p=pozoBy(st.pozo);let t=`📍 GPS tomado (±${Math.round(st.gps.acc)} m)`;
+  if(p&&p.lat!=null&&p.lng!=null){const d=distM(st.gps.lat,st.gps.lng,p.lat,p.lng);
+    t+=d>300?` · <b class="danger">Estás a ${d>1000?fmt(d/1000,1)+" km":Math.round(d)+" m"} de ${esc(p.nombre)}: ¿es el pozo correcto?</b>`:` · a ${Math.round(d)} m del pozo ✓`}
+  el.innerHTML=t;
+}
+
+/* ======= formulario ======= */
+const lastOf=pid=>[...lecturas,...cola].filter(l=>l.pozoId===pid).sort((a,b)=>tsOf(b)-tsOf(a))[0];
+function pozoList(c){return cfg.pozos.filter(p=>p.campo===c)}
+function renderForm(){
+  $("campoSeg").innerHTML=[["CP","Campo Plata"],["LST","LST"]].map(([id,n])=>`<button class="opt" style="text-align:center" aria-pressed="${st.campo===id}" data-c="${id}">${n}</button>`).join("");
+  $("campoSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{st.campo=b.dataset.c;st.pozo=null;renderForm()});
+  const list=pozoList(st.campo);
+  $("pozoGrid").innerHTML=list.length?list.map(p=>{const l=lastOf(p.id);return `<button class="opt" aria-pressed="${st.pozo===p.id}" data-p="${p.id}">${esc(p.nombre)}<small>${l&&l.fecha===hoy()?"✓ hoy":esc(p.lote||"")}</small></button>`}).join(""):`<div class="empty" style="grid-column:1/-1">${ses?"Sincronizá con señal para traer los pozos.":""}</div>`;
+  $("pozoGrid").querySelectorAll("button").forEach(b=>b.onclick=()=>{st.pozo=b.dataset.p;st.estado=null;renderForm();calc();tomarGPS()});
+  const p=pozoBy(st.pozo);
+  if(p){const l=lastOf(p.id);$("pozoInfo").innerHTML=`<b>${esc(p.nombre)}</b> · Lote ${esc(p.lote||"sin asignar")}`+(l?` · Última: ${fmt(l.profundidad)} m el ${fdate(l.fecha)}`:" · Sin lecturas previas")}
+  else $("pozoInfo").textContent="Elegí el freatímetro que estás midiendo.";
+  renderGps();renderEstado();$("guardar").disabled=!st.pozo;calc();
+}
+function renderEstado(){
+  const crop=st.pozo?cropOf(st.pozo):null,box=$("cultivoActivo");
+  $("addCropBox").hidden=true;
+  if(crop){
+    box.hidden=false;
+    box.innerHTML=`<div><b>${esc(crop.cultivo)}</b> · sembrado el ${fdate(crop.fs)}</div><div style="font-family:var(--mono)">${dias(crop.fs,$("fecha").value||hoy())} DDS (días desde siembra)</div>
+      <button class="link danger" id="cerrarCultivo">Cultivo cosechado: volver a barbecho</button>`;
+    $("estadoOpts").hidden=true;$("nuevoCultivo").hidden=true;st.estado="cultivo";fillFeno(crop.cultivo);
+    const cb=$("cerrarCultivo");cb.onclick=()=>{
+      if(cb.dataset.armed!=="1"){cb.dataset.armed="1";cb.textContent="Tocá de nuevo para confirmar la cosecha";setTimeout(()=>{cb.dataset.armed="";cb.textContent="Cultivo cosechado: volver a barbecho"},5000);return}
+      cerrarCultivo(st.pozo)};
+  }else{
+    box.hidden=true;$("estadoOpts").hidden=false;
+    $("estadoOpts").innerHTML=ESTADOS.map(i=>`<button class="opt" aria-pressed="${st.estado===i.id}" data-v="${i.id}">${i.t}<small>${i.s}</small></button>`).join("");
+    $("estadoOpts").querySelectorAll("button").forEach(b=>b.onclick=()=>{st.estado=st.estado===b.dataset.v?null:b.dataset.v;renderEstado()});
+    const n=st.estado==="cultivo";$("nuevoCultivo").hidden=!n;$("addCropBox").hidden=!(n&&isAdmin());
+    if(n)fillFeno($("cultivo").value);else $("fenoWrap").hidden=true;
+  }
+}
+async function cerrarCultivo(pid){
+  if(cfg.activos)delete cfg.activos[pid];LS.set("cfg",cfg);
+  try{const r=await api("cerrarCultivo",{pozoId:pid,fecha:hoy()});if(!r.ok)throw 0}
+  catch(e){showMsg("formMsg","info","Se cierra el cultivo en el servidor la próxima vez que haya señal.");LS.set("cierres",[...LS.get("cierres",[]),{pozoId:pid,fecha:hoy()}])}
+  st.estado=null;renderEstado();
+}
+function calc(){
+  const p=pozoBy(st.pozo),a=p&&p.alturaCano!=null?Number(p.alturaCano):0,corr=p&&p.correccion?Number(p.correccion):0,l=parseFloat($("lectura").value);
+  $("alturaInfo").innerHTML=!p?"":p.alturaCano!=null?`Altura fija del caño: <b>${fmt(a)} m</b>`+(corr?` · ajuste de boya: <b>${corr>0?"+":""}${fmt(corr)} m</b>`:"")+" (se aplican solos)":`<span class="danger">Falta la altura del caño de ${esc(p.nombre)} en su ficha. Por ahora se toma 0.</span>`;
+  const r=isNaN(l)?null:Math.round((l-a+corr)*100)/100;
+  $("prof").textContent=r==null?"–":fmt(r)+" m";const z=zona(r);$("profZone").innerHTML=z?`<span class="zone ${z.c}">${z.t}</span>`:"";return r;
+}
+$("lectura").addEventListener("input",calc);$("fecha").addEventListener("change",renderEstado);$("cultivo").addEventListener("change",()=>fillFeno($("cultivo").value));
+
+$("guardar").onclick=()=>{
+  const p=pozoBy(st.pozo),lect=parseFloat($("lectura").value);
+  if(!p){showMsg("formMsg","err","Elegí el freatímetro.");return}
+  if(isNaN(lect)){showMsg("formMsg","err","Falta la lectura de la vara.");$("lectura").focus();return}
+  const prof=calc();if(prof<0){showMsg("formMsg","err","La profundidad da negativa: revisá la lectura de la vara.");return}
+  const fecha=$("fecha").value||hoy(),hora=$("hora").value||ahora(),crop=cropOf(p.id);
+  let cultivo=null,fs=null,abre=false;
+  if(crop){cultivo=crop.cultivo;fs=crop.fs}
+  else if(st.estado==="cultivo"){cultivo=$("cultivo").value;fs=$("fs").value;
+    if(!cultivo||!fs){showMsg("formMsg","err","Para un lote sembrado cargá el cultivo y la fecha de siembra (FS).");return}
+    if(fs>fecha){showMsg("formMsg","err","La fecha de siembra no puede ser posterior a la lectura.");return}abre=true}
+  const num=id=>$(id).value===""?null:Number($(id).value),estadio=cultivo?$("estadio").value||"":"",esc2=cultivo&&escalaDe(cultivo);
+  const r={id:"L"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),pozoId:p.id,campo:p.campo,lote:p.lote||"",fecha,hora,
+    lecturaVara:lect,alturaCano:p.alturaCano??0,correccion:p.correccion||0,profundidad:prof,lluvia:num("lluvia"),
+    estado:st.estado||"",estadoTxt:EST_TXT[st.estado]||"",malezas:num("malezas"),verde:num("verde"),cobertura:num("cob"),
+    cultivo:cultivo||"",fs:fs||"",dds:fs?dias(fs,fecha):null,estadio,escalaFeno:esc2?esc2.escala:"",obs:$("obs").value.trim(),
+    lat:st.gps?Math.round(st.gps.lat*1e6)/1e6:null,lng:st.gps?Math.round(st.gps.lng*1e6)/1e6:null,autor:ses.nombre};
+  if(abre)r.abreCultivo=true;
+  cola.push(r);LS.set("cola",cola);
+  showMsg("formMsg","ok",`✓ Guardada: ${p.nombre} · ${fmt(prof)} m${cultivo?` · ${cultivo} ${estadio} (${r.dds} DDS)`:""}.`);
+  $("lectura").value="";$("lluvia").value="";$("obs").value="";["malezas","verde","cob","cultivo","estadio","fs"].forEach(id=>$(id).value="");
+  st.pozo=null;st.estado=null;st.gps=null;$("hora").value=ahora();renderForm();renderNet();window.scrollTo({top:0,behavior:"smooth"});
+  if(navigator.onLine)sincronizar();
+};
+
+/* ======= agregar cultivo (admin) ======= */
+$("nc-escala").innerHTML=Object.entries(ESCALAS_EXTRA).map(([k,v])=>`<option value="${k}">${esc(v.nombre)}</option>`).join("");
+$("nc-save").onclick=async()=>{
+  const nombre=$("nc-nombre").value.trim().replace(/\s+/g," ");
+  if(!nombre){showMsg("nc-msg","err","Escribí el nombre.");return}
+  if(FENO[nombre]||extraOf(nombre)){showMsg("nc-msg","err","Ya está en la lista.");return}
+  try{const r=await api("agregarCultivo",{nombre,escala:$("nc-escala").value,servicio:$("nc-serv").checked});if(!r.ok)throw 0;
+    cfg.cultivos=[...(cfg.cultivos||[]),{nombre,escala:$("nc-escala").value,servicio:$("nc-serv").checked}];LS.set("cfg",cfg);
+    fillCultivoSelect();$("cultivo").value=nombre;fillFeno(nombre);$("nc-nombre").value="";showMsg("nc-msg","ok",nombre+" agregado.")}
+  catch(e){showMsg("nc-msg","err","Hace falta señal para agregar un cultivo.")}
+};
+
+/* ======= vistas ======= */
+function setView(v){st.view=v;["cargar","pozos","hist"].forEach(x=>$("v-"+x).hidden=x!==v);document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.v===v));renderAll()}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{if(b.dataset.v==="pozos")st.detalle=null;setView(b.dataset.v)});
+function renderAll(){if(!ses)return;if(st.view==="cargar")renderForm();if(st.view==="pozos")renderPozos();if(st.view==="hist")renderHist()}
+const todas=()=>{const ids=new Set(lecturas.map(l=>l.id));return [...lecturas,...cola.filter(c=>!ids.has(c.id)).map(c=>({...c,_local:true}))]};
+
+function spark(pid){const ls=todas().filter(l=>l.pozoId===pid&&l.profundidad!=null).sort((a,b)=>tsOf(a)-tsOf(b)).slice(-10);if(ls.length<2)return"";
+  const w=70,h=22,vs=ls.map(l=>l.profundidad),mn=Math.min(...vs),mx=Math.max(...vs),r=mx-mn||1;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${ls.map((l,i)=>`${(i/(ls.length-1)*w).toFixed(1)},${((l.profundidad-mn)/r*(h-4)+2).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--water)" stroke-width="1.6"/></svg>`}
+function renderPozos(){
+  if(st.detalle){renderDetalle();return}
+  $("pozoDetalle").hidden=true;$("pozoCards").hidden=false;let h="";
+  for(const [c,n] of [["CP","Campo Plata"],["LST","LST"]]){
+    h+=`<h2 style="margin-top:6px">${n}</h2>`;const list=pozoList(c);
+    if(!list.length){h+=`<div class="empty">Sin pozos todavía.</div>`;continue}
+    for(const p of list){
+      const ls=todas().filter(l=>l.pozoId===p.id).sort((a,b)=>tsOf(b)-tsOf(a)),l=ls[0],pv=ls[1],z=l?zona(l.profundidad):null;
+      let d="";if(l&&pv){const df=Math.round((l.profundidad-pv.profundidad)*100);d=df<0?`<span class="up">▲ subió ${-df} cm</span>`:df>0?`<span class="down">▼ bajó ${df} cm</span>`:"sin cambio"}
+      const dd=l?Math.floor((Date.now()-tsOf(l))/864e5):null,cr=cropOf(p.id);
+      h+=`<button class="card" data-p="${p.id}"><div><div class="id">${esc(p.nombre)}${p.fijada?" 🔒":""}</div><div class="sub">Lote ${esc(p.lote||"–")}</div></div>
+       <div>${z?`<span class="zone ${z.c}">${z.t}</span>`:`<span class="xs">Sin lecturas</span>`}${cr?`<div class="cr">${esc(cr.cultivo)} · ${dias(cr.fs,hoy())} DDS</div>`:""}<div class="xs">${dd==null?"":dd===0?"Medido hoy":`Hace ${dd} día${dd>1?"s":""}`}</div>${spark(p.id)}</div>
+       <div><div class="val">${l?fmt(l.profundidad)+" m":"–"}</div><div class="d">${d}</div></div></button>`}
+  }
+  $("pozoCards").innerHTML=h;$("pozoCards").querySelectorAll(".card").forEach(b=>b.onclick=()=>{st.detalle=b.dataset.p;renderPozos();window.scrollTo({top:0})});
+}
+function ejeX(ls,W,L,R){const t0=tsOf(ls[0]),t1=tsOf(ls[ls.length-1]),span=Math.max(t1-t0,864e5);return{t0,t1,x:t=>L+(ls.length===1?(W-L-R)/2:(t-t0)/span*(W-L-R))}}
+const fl=t=>new Date(t).toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit"});
+function chartNapa(ls,crop){
+  if(!ls.length)return`<div class="empty">Todavía no hay lecturas de este pozo.</div>`;
+  const W=600,H=260,L=44,R=40,T=14,B=34,{t0,t1,x}=ejeX(ls,W,L,R);
+  const maxD=Math.max(3,Math.ceil(Math.max(...ls.map(l=>l.profundidad||0))+0.5)),maxR=Math.max(50,Math.ceil(Math.max(...ls.map(l=>l.lluvia||0))/25)*25);
+  const y=d=>T+d/maxD*(H-T-B),yr=mm=>H-B-mm/maxR*(H-T-B)*0.45;
+  let g=`<rect x="${L}" y="${y(1.5)}" width="${W-L-R}" height="${y(2.5)-y(1.5)}" fill="var(--ok-soft)"/><rect x="${L}" y="${T}" width="${W-L-R}" height="${y(1)-T}" fill="var(--bad-soft)"/>`;
+  for(let d=0;d<=maxD;d+=0.5){g+=`<line x1="${L}" x2="${W-R}" y1="${y(d)}" y2="${y(d)}" stroke="var(--line)" stroke-width="${d%1?0.5:1}"/>`;if(d%1===0)g+=`<text x="${L-6}" y="${y(d)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${d} m</text>`}
+  if(crop&&ls.length>1){const ts=new Date(crop.fs+"T12:00").getTime();if(ts>=t0&&ts<=t1){const xs=x(ts);g+=`<line x1="${xs}" x2="${xs}" y1="${T}" y2="${H-B}" stroke="var(--crop)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="${xs+4}" y="${T+12}" font-size="11" fill="var(--crop)">Siembra</text>`}}
+  ls.forEach(l=>{if(l.lluvia){const xx=x(tsOf(l));g+=`<rect x="${xx-5}" y="${yr(l.lluvia)}" width="10" height="${H-B-yr(l.lluvia)}" fill="var(--soil)" opacity=".55"/>`}});
+  g+=`<text x="${W-R+6}" y="${H-B+4}" font-size="10" fill="var(--soil)">0</text><text x="${W-R+6}" y="${yr(maxR)+4}" font-size="10" fill="var(--soil)">${maxR}mm</text>`;
+  g+=`<polyline points="${ls.map(l=>`${x(tsOf(l)).toFixed(1)},${y(l.profundidad).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--water)" stroke-width="2.4"/>`;
+  ls.forEach((l,i)=>{g+=`<circle cx="${x(tsOf(l))}" cy="${y(l.profundidad)}" r="${i===ls.length-1?5:3.2}" fill="var(--water)" stroke="var(--surface)" stroke-width="1.5"/>`});
+  g+=`<text x="${x(t0)}" y="${H-14}" font-size="11" fill="var(--muted)">${fl(t0)}</text>`+(ls.length>1?`<text x="${x(t1)}" y="${H-14}" font-size="11" fill="var(--muted)" text-anchor="end">${fl(t1)}</text>`:"");
+  g+=`<text x="${L}" y="${H-1}" font-size="10" fill="var(--muted)">Línea azul: napa (más abajo = más profunda) · Barras: lluvia (mm)</text>`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}">${g}</svg>`;
+}
+function chartEscalas(ls){
+  if(!ls.some(l=>l.malezas!=null||l.verde!=null||l.cobertura!=null||l.estadio))return`<div class="empty">Cuando se carguen malezas, verde, rastrojo o estadio, se ven acá.</div>`;
+  const W=600,H=230,L=44,R=40,T=34,B=30,{t0,t1,x}=ejeX(ls,W,L,R),y=v=>T+(5-v)/4*(H-T-B);let g="";
+  for(let v=1;v<=5;v++)g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${v}</text>`;
+  const se=[["malezas","var(--bad)","Malezas"],["verde","var(--crop)","Verde activo"],["cobertura","var(--soil)","Rastrojo"]];
+  se.forEach(([k,col],i)=>{const pts=ls.filter(l=>l[k]!=null);if(pts.length>1)g+=`<polyline points="${pts.map(l=>`${x(tsOf(l)).toFixed(1)},${(y(l[k])+(i-1)*2.5).toFixed(1)}`).join(" ")}" fill="none" stroke="${col}" stroke-width="2.2"/>`;
+    pts.forEach(l=>g+=`<circle cx="${x(tsOf(l))}" cy="${y(l[k])+(i-1)*2.5}" r="3.6" fill="${col}"/>`)});
+  let lx=-99;ls.forEach(l=>{if(!l.estadio)return;const xs=x(tsOf(l));g+=`<line x1="${xs}" x2="${xs}" y1="${T-6}" y2="${H-B}" stroke="var(--crop)" stroke-width=".8" stroke-dasharray="2 3" opacity=".6"/>`;if(xs-lx>34){g+=`<text x="${xs}" y="${T-10}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--crop)">${esc(l.estadio)}</text>`;lx=xs}});
+  g+=`<text x="${x(t0)}" y="${H-10}" font-size="11" fill="var(--muted)">${fl(t0)}</text>`+(ls.length>1?`<text x="${x(t1)}" y="${H-10}" font-size="11" fill="var(--muted)" text-anchor="end">${fl(t1)}</text>`:"");
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}">${g}</svg><div class="legend xs" style="gap:12px">${se.map(([,c,t])=>`<span><span style="display:inline-block;width:12px;height:3px;background:${c};vertical-align:middle"></span> ${t}</span>`).join("")}<span style="color:var(--crop);font-weight:700">V/R… = estadio</span></div><div class="xs">Escala 1 a 5: 1 = nada o mínimo, 5 = máximo.</div>`;
+}
+function renderDetalle(){
+  const p=pozoBy(st.detalle);if(!p){st.detalle=null;renderPozos();return}
+  $("pozoCards").hidden=true;const box=$("pozoDetalle");box.hidden=false;
+  const ls=todas().filter(l=>l.pozoId===p.id&&l.profundidad!=null).sort((a,b)=>tsOf(a)-tsOf(b)),cr=cropOf(p.id);
+  let h=`<button class="link" id="volver">← Todos los pozos</button>
+   <div class="panel"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap"><h2 style="font-size:20px;color:var(--fg);font-family:var(--mono)">${esc(p.nombre)}</h2><span class="xs">${p.campo==="CP"?"Campo Plata":"LST"} · Lote ${esc(p.lote||"–")}</span></div>
+   ${cr?`<div class="crop"><div><b>${esc(cr.cultivo)}</b> · FS ${fdate(cr.fs)}</div><div style="font-family:var(--mono)">${dias(cr.fs,hoy())} DDS</div></div>`:""}
+   <h2>Napa y lluvia</h2>${chartNapa(ls,cr)}<h2>Estado del lote</h2>${chartEscalas(ls)}</div>`+fichaHtml(p);
+  const rows=[...ls].reverse();
+  h+=`<div class="panel"><h2>Lecturas</h2><div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Napa</th><th>Lluvia</th><th>Estado / cultivo</th><th>DDS</th><th>Mal.</th><th>Verde</th><th>Rastr.</th><th>Cargó</th><th>Obs.</th></tr></thead><tbody>${
+   rows.map(l=>`<tr><td>${fdate(l.fecha)}${l._local?" ⏳":""}</td><td class="n">${fmt(l.profundidad)}</td><td class="n">${l.lluvia??"–"}</td><td>${esc(l.cultivo?l.cultivo+" "+(l.estadio||""):(EST_TXT[l.estado]||l.estado||"–"))}</td><td class="n">${l.dds??"–"}</td><td class="n">${l.malezas??"–"}</td><td class="n">${l.verde??"–"}</td><td class="n">${l.cobertura??"–"}</td><td>${esc(l.autor||"")}</td><td>${esc(l.obs||"")}</td></tr>`).join("")||`<tr><td colspan="10" class="xs">Sin lecturas</td></tr>`}</tbody></table></div><div class="xs">⏳ = guardada en el teléfono, falta subir.</div></div>`;
+  box.innerHTML=h;$("volver").onclick=()=>{st.detalle=null;renderPozos()};bindFicha(p);
+}
+
+/* ======= ficha fija ======= */
+function parseCoords(t){const m=String(t||"").match(/(-?\d{1,2}[.,]\d+)[\s,;]+(-?\d{1,3}[.,]\d+)/);if(!m)return null;const a=Number(m[1].replace(",",".")),b=Number(m[2].replace(",","."));return Math.abs(a)>90||Math.abs(b)>180?null:{lat:a,lng:b}}
+const mapa=(a,b)=>`https://www.google.com/maps/search/?api=1&query=${a},${b}`;
+function fichaHtml(p){
+  const datos=`<div class="tablewrap"><table><tbody>
+   <tr><th>Altura del caño</th><td class="n">${p.alturaCano!=null?fmt(p.alturaCano)+" m":"<span class='danger'>falta</span>"}</td></tr>
+   <tr><th>Ajuste de la boya</th><td class="n">${p.correccion?(p.correccion>0?"+":"")+fmt(p.correccion)+" m":"0"}</td></tr>
+   <tr><th>Profundidad total del caño</th><td class="n">${p.profTotal!=null?fmt(p.profTotal)+" m":"–"}</td></tr>
+   <tr><th>Ubicación</th><td>${p.lat!=null?`<a href="${mapa(p.lat,p.lng)}" target="_blank" rel="noopener">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</a>`:"<span class='danger'>falta</span>"}</td></tr></tbody></table></div>`;
+  if(p.fijada)return `<div class="panel"><h2>🔒 Ficha fija</h2>${datos}<div class="xs">Fijada el ${fdate(p.fijadaEl)}.</div>${isAdmin()?`<button class="link danger" id="f-unlock">Desbloquear para corregir</button>`:""}<div id="f-msg" hidden></div></div>`;
+  if(!isAdmin())return `<div class="panel"><h2>Ficha del pozo</h2>${datos}<div class="xs">La ficha la completa el administrador.</div></div>`;
+  return `<div class="panel"><h2>Ficha del pozo · sin fijar</h2>
+   <div class="row2"><label class="f">Nombre<input id="f-nombre" value="${esc(p.nombre)}"></label><label class="f">Lote<input id="f-lote" value="${esc(p.lote||"")}"></label></div>
+   <div class="row2"><label class="f">Altura del caño (m)<span class="h">Cuánto sobresale del suelo</span><input id="f-alt" type="number" inputmode="decimal" step="0.01" value="${p.alturaCano??""}"></label>
+   <label class="f">Ajuste de la boya (m)<span class="h">Se suma a la vara (+ si marca de menos)</span><input id="f-corr" type="number" inputmode="decimal" step="0.01" value="${p.correccion??0}"></label></div>
+   <label class="f">Profundidad total del caño (m)<input id="f-tot" type="number" inputmode="decimal" step="0.1" value="${p.profTotal??""}"></label>
+   <label class="f">Ubicación (latitud, longitud)<input id="f-coords" placeholder="-27.61234, -61.34567" value="${p.lat!=null?p.lat+", "+p.lng:""}"></label>
+   <button class="btn sec" id="f-gps">📍 Usar mi ubicación actual (estoy en el pozo)</button>
+   <div id="f-cok" class="xs"></div>
+   <div class="row2"><button class="btn sec" id="f-save">Guardar borrador</button><button class="btn" id="f-fix">Guardar y fijar 🔒</button></div>
+   <div id="f-msg" hidden></div></div>`;
+}
+function bindFicha(p){
+  const u=$("f-unlock");if(u)u.onclick=async()=>{if(u.dataset.armed!=="1"){u.dataset.armed="1";u.textContent="Tocá de nuevo para desbloquear";return}
+    try{const r=await api("guardarPozo",{pozo:{id:p.id},desbloquear:true});if(!r.ok)throw 0;p.fijada=false;LS.set("cfg",cfg);renderDetalle()}catch(e){showMsg("f-msg","err","Hace falta señal.")}};
+  if(!$("f-save"))return;
+  const showC=()=>{const c=parseCoords($("f-coords").value);$("f-cok").innerHTML=!$("f-coords").value.trim()?"":c?`✓ ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)} · <a href="${mapa(c.lat,c.lng)}" target="_blank" rel="noopener">ver en el mapa</a>`:`<span class="danger">Coordenadas no válidas.</span>`};
+  $("f-coords").addEventListener("input",showC);showC();
+  $("f-gps").onclick=()=>{$("f-cok").textContent="Buscando GPS…";tomarGPS(g=>{if(!g){$("f-cok").innerHTML=`<span class="danger">No se pudo tomar el GPS. Activá la ubicación del teléfono.</span>`;return}
+    $("f-coords").value=g.lat.toFixed(6)+", "+g.lng.toFixed(6);showC();$("f-cok").innerHTML+=` · precisión ±${Math.round(g.acc)} m`+(g.acc>25?` <b class="danger">(esperá unos segundos y volvé a tocar para mejorarla)</b>`:"")})};
+  const num=v=>{v=String(v).replace(",",".").trim();return v===""?null:Number(v)};
+  const save=async fijar=>{const c=parseCoords($("f-coords").value);
+    const pz={id:p.id,nombre:$("f-nombre").value.trim()||p.nombre,lote:$("f-lote").value.trim(),alturaCano:num($("f-alt").value),correccion:num($("f-corr").value)||0,profTotal:num($("f-tot").value),lat:c?c.lat:null,lng:c?c.lng:null,fijar};
+    if(fijar){const f=[pz.alturaCano==null&&"altura del caño",!c&&"ubicación"].filter(Boolean);if(f.length){showMsg("f-msg","err","Para fijar falta: "+f.join(" y ")+".");return}}
+    try{const r=await api("guardarPozo",{pozo:pz});if(!r.ok)throw r;Object.assign(p,pz,{fijada:fijar,fijadaEl:fijar?hoy():""});LS.set("cfg",cfg);renderDetalle();if(!fijar)showMsg("f-msg","ok","Borrador guardado.")}
+    catch(e){showMsg("f-msg","err","No se pudo guardar. Hace falta señal.")}};
+  $("f-save").onclick=()=>save(false);$("f-fix").onclick=()=>save(true);
+}
+
+/* ======= historial ======= */
+function renderHist(){
+  $("histFiltro").innerHTML=[["CP","Campo Plata"],["LST","LST"]].map(([id,n])=>`<button class="opt" style="text-align:center" aria-pressed="${st.hist===id}" data-c="${id}">${n}</button>`).join("");
+  $("histFiltro").querySelectorAll("button").forEach(b=>b.onclick=()=>{st.hist=b.dataset.c;renderHist()});
+  const u=LS.get("ultimaSync",null);
+  $("histInfo").innerHTML=`Sesión: <b>${esc(ses.nombre)}</b>${isAdmin()?" (administrador)":""} · ${cola.length} sin subir · Última sincronización: ${u?new Date(u).toLocaleString("es-AR"):"nunca"}`;
+  const ls=todas().filter(l=>l.campo===st.hist).sort((a,b)=>tsOf(b)-tsOf(a));
+  if(!ls.length){$("histList").innerHTML=`<div class="empty">Sin lecturas de ${st.hist==="CP"?"Campo Plata":"LST"} todavía.</div>`;return}
+  const by={};ls.forEach(l=>(by[l.fecha]=by[l.fecha]||[]).push(l));
+  $("histList").innerHTML=Object.entries(by).map(([f,a])=>`<div class="panel"><h2>${new Date(f+"T12:00").toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"})}</h2><div class="tablewrap"><table><thead><tr><th>Pozo</th><th>Napa (m)</th><th>Lluvia</th><th>Estado</th><th>Cargó</th></tr></thead><tbody>${
+   a.map(l=>`<tr><td style="font-family:var(--mono)">${esc(l.pozoId)}${l._local?" ⏳":""}</td><td class="n">${fmt(l.profundidad)}</td><td class="n">${l.lluvia??"–"}</td><td>${esc(l.cultivo?l.cultivo+" "+(l.estadio||""):(EST_TXT[l.estado]||l.estado||"–"))}</td><td>${esc(l.autor||"")}</td></tr>`).join("")}</tbody></table></div></div>`).join("");
+}
+$("btnSync").onclick=()=>sincronizar();
+$("btnCsv").onclick=()=>{
+  const head=["Fecha","Hora","Campo","Pozo","Lote","Lectura vara (m)","Altura caño (m)","Ajuste boya (m)","Profundidad napa (m)","Lluvia (mm)","Estado","Malezas 1-5","Verde 1-5","Rastrojo 1-5","Cultivo","FS","DDS","Estadio","Observaciones","Cargó"];
+  const rows=todas().sort((a,b)=>tsOf(a)-tsOf(b)).map(l=>[fdate(l.fecha),l.hora,l.campo==="CP"?"Campo Plata":"LST",l.pozoId,l.lote,l.lecturaVara,l.alturaCano,l.correccion,l.profundidad,l.lluvia??"",EST_TXT[l.estado]||l.estado||"",l.malezas??"",l.verde??"",l.cobertura??"",l.cultivo||"",l.fs?fdate(l.fs):"",l.dds??"",l.estadio||"",l.obs||"",l.autor||""]);
+  const csv="﻿"+[head,...rows].map(r=>r.map(v=>{v=String(v??"");return /[;"\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v}).join(";")).join("\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=`freatimetros_${hoy()}.csv`;a.click();
+};
+
+/* ======= arranque ======= */
+$("fecha").value=hoy();$("hora").value=ahora();
+fillSel("malezas",MALEZAS);fillSel("verde",VERDE);fillSel("cob",COB);fillCultivoSelect();renderNet();boot();
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
