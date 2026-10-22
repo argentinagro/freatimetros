@@ -149,10 +149,8 @@ td.n{font-family:var(--mono);text-align:right}
   </div>
   <div class="panel">
     <h2 id="t2">2 · Lectura de napa</h2>
-    <div class="row2">
-      <label class="f">Fecha<input type="date" id="fecha"></label>
-      <label class="f">Hora<input type="time" id="hora"></label>
-    </div>
+    <label class="f">Fecha<input type="date" id="fecha"></label>
+    <input type="time" id="hora" hidden>
     <label class="f">Lectura de la vara (m)
       <span class="h">Lo que marca la vara de la boya a ras de la boca del caño</span>
       <input class="num" id="lectura" type="number" inputmode="decimal" step="0.01" min="0" max="20" placeholder="0,00"></label>
@@ -492,7 +490,7 @@ function editar(id){
 }
 function renderEdit(){
   const b=$("editBanner");if(!st.edit){b.hidden=true;return}
-  b.hidden=false;b.innerHTML=`<span>✏️ Editando lectura del ${fdate(st.edit.fecha)} ${esc(st.edit.hora||"")} (${esc(nomPozo(st.edit.pozo))})</span><button id="cancelEd">Cancelar edición</button>`;
+  b.hidden=false;b.innerHTML=`<span>✏️ Editando lectura del ${fdate(st.edit.fecha)} (${esc(nomPozo(st.edit.pozo))})</span><button id="cancelEd">Cancelar edición</button>`;
   $("cancelEd").onclick=()=>{st.edit=null;st.pozo=null;st.estado=null;limpiarForm();renderForm()};
 }
 
