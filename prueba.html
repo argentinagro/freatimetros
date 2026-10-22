@@ -194,7 +194,7 @@ td.n{font-family:var(--mono);text-align:right}
 <section id="v-pozos" hidden>
   <div class="legend">
     <span class="zone z-bad">&lt; 1 m anegamiento</span><span class="zone z-warn">1–1,5 alta</span>
-    <span class="zone z-ok">1,5–2,5 óptima</span><span class="zone z-warn">2,5–4 aporte bajo</span><span class="zone z-dry">&gt; 4 sin aporte</span>
+    <span class="zone z-ok">1,5–2,5 óptima</span><span class="zone z-warn">2,5–3,5 aporte bajo</span><span class="zone z-dry">&gt; 3,5 sin aporte</span>
   </div>
   <div id="pozoCards" class="cards"></div>
   <div id="pozoDetalle" hidden></div>
@@ -207,7 +207,7 @@ td.n{font-family:var(--mono);text-align:right}
   <div id="mapa" class="mapa"><div class="empty" id="mapaMsg">Cargando mapa…</div></div>
   <div class="row2"><button class="btn sec" id="btnYo">🧭 Centrar en mí</button><button class="btn sec" id="btnTodos">🗺️ Ver todos</button></div>
   <div class="legend">
-    <span class="zone z-bad">&lt; 1 m</span><span class="zone z-warn">1–1,5</span><span class="zone z-ok">1,5–2,5</span><span class="zone z-warn">2,5–4</span><span class="zone z-dry">&gt; 4 / sin dato</span>
+    <span class="zone z-bad">&lt; 1 m</span><span class="zone z-warn">1–1,5</span><span class="zone z-ok">1,5–2,5</span><span class="zone z-warn">2,5–3,5</span><span class="zone z-dry">&gt; 3,5 / sin dato</span>
   </div>
   <div id="mapaLista" class="cards"></div>
 </section>
@@ -260,7 +260,7 @@ const ahora=()=>{const d=new Date();return String(d.getHours()).padStart(2,"0")+
 const dias=(a,b)=>Math.round((new Date(b+"T12:00")-new Date(a+"T12:00"))/864e5);
 const tsOf=l=>new Date((l.fecha||"1970-01-01")+"T"+(l.hora||"12:00")).getTime();
 function showMsg(id,k,t){const m=$(id);m.hidden=false;m.className="msg "+k;m.textContent=t}
-function zona(p){if(p==null||isNaN(p))return null;if(p<1)return{c:"z-bad",t:"Riesgo anegamiento"};if(p<1.5)return{c:"z-warn",t:"Napa alta"};if(p<=2.5)return{c:"z-ok",t:"Rango óptimo"};if(p<=4)return{c:"z-warn",t:"Aporte bajo"};return{c:"z-dry",t:"Sin aporte"}}
+function zona(p){if(p==null||isNaN(p))return null;if(p<1)return{c:"z-bad",t:"Riesgo anegamiento"};if(p<1.5)return{c:"z-warn",t:"Napa alta"};if(p<=2.5)return{c:"z-ok",t:"Rango óptimo"};if(p<=3.5)return{c:"z-warn",t:"Aporte bajo"};return{c:"z-dry",t:"Sin aporte"}}
 
 /* ======= servidor ======= */
 async function api(action,data={},auth=true){
@@ -332,6 +332,7 @@ $("btnSalir").onclick=()=>{const b=$("btnSalir");if(b.dataset.armed!=="1"){b.dat
 const isAdmin=()=>ses&&ses.rol==="admin";
 const pozoBy=id=>cfg.pozos.find(p=>p.id===id);
 const nomPozo=id=>{const p=pozoBy(id);return p&&p.nombre?p.nombre:id};
+const loteTxt=(v,d="–")=>{v=String(v||"").trim();return !v?"Lote "+d:/^lote/i.test(v)?v:"Lote "+v};
 const extraOf=c=>(cfg.cultivos||[]).find(x=>x.nombre===c);
 function escalaDe(c){if(FENO[c])return FENO[c];const x=extraOf(c);if(!x||!ESCALAS_EXTRA[x.escala])return null;const b=ESCALAS_EXTRA[x.escala].base;return x.servicio?{escala:b.escala,e:[...b.e,["SEC","Secado (químico o rolado)"]]}:b}
 function cropOf(pid){const q=cola.filter(r=>r.pozoId===pid&&r.abreCultivo).pop();if(q)return{cultivo:q.cultivo,fs:q.fs,local:true};
@@ -375,7 +376,7 @@ function renderForm(){
   $("pozoGrid").innerHTML=list.length?list.map(p=>{const l=lastOf(p.id);const h=l&&l.fecha===hoy(),sel=st.pozo===p.id;return `<button class="opt${h?" hoy":""}" aria-pressed="${sel}" data-p="${p.id}">${esc(p.nombre)}<small>${sel?"✔ elegido":h?"✓ hoy":esc(p.lote||"")}</small></button>`}).join(""):`<div class="empty" style="grid-column:1/-1">${ses?"Sincronizá con señal para traer los pozos.":""}</div>`;
   $("pozoGrid").querySelectorAll("button").forEach(b=>b.onclick=()=>{st.pozo=b.dataset.p;if(!st.edit){st.estado=null;tomarGPS()}renderForm();calc()});
   const p=pozoBy(st.pozo);
-  if(p){const l=lastOf(p.id);$("pozoInfo").innerHTML=`<div class="selcard"><b>📍 ${esc(p.nombre)}</b><span>${p.campo==="CP"?"Campo Plata":"LST"} · Lote ${esc(p.lote||"sin asignar")}`+(l&&!(st.edit&&l.id===st.edit.id)?` · Última: ${fmt(l.profundidad)} m el ${fdate(l.fecha)}`:"")+`</span></div>`}
+  if(p){const l=lastOf(p.id);$("pozoInfo").innerHTML=`<div class="selcard"><b>📍 ${esc(p.nombre)}</b><span>${p.campo==="CP"?"Campo Plata":"LST"} · ${esc(loteTxt(p.lote,"sin asignar"))}`+(l&&!(st.edit&&l.id===st.edit.id)?` · Última: ${fmt(l.profundidad)} m el ${fdate(l.fecha)}`:"")+`</span></div>`}
   else $("pozoInfo").innerHTML=`<div class="selhint">👆 Tocá el freatímetro que vas a medir</div>`;
   $("t2").innerHTML="2 · Lectura de napa"+(p?` <span class="tag">${esc(p.nombre)}</span>`:"");
   $("guardar").textContent=st.edit?"Guardar cambios":(p?"Guardar lectura de "+p.nombre:"Guardar lectura");
@@ -477,7 +478,7 @@ $("nc-save").onclick=async()=>{
   const nombre=$("nc-nombre").value.trim().replace(/\s+/g," ");
   if(!nombre){showMsg("nc-msg","err","Escribí el nombre.");return}
   if(FENO[nombre]||extraOf(nombre)){showMsg("nc-msg","err","Ya está en la lista.");return}
-  try{const r=await api("agregarCultivo",{nombre,escala:$("nc-escala").value,servicio:$("nc-serv").checked});if(!r.ok)throw 0;
+  try{const r=await api("agregarCultivo",{nombreCultivo:nombre,escala:$("nc-escala").value,servicio:$("nc-serv").checked});if(!r.ok)throw 0;
     cfg.cultivos=[...(cfg.cultivos||[]),{nombre,escala:$("nc-escala").value,servicio:$("nc-serv").checked}];LS.set("cfg",cfg);
     fillCultivoSelect();$("cultivo").value=nombre;fillFeno(nombre);$("nc-nombre").value="";showMsg("nc-msg","ok",nombre+" agregado.")}
   catch(e){showMsg("nc-msg","err","Hace falta señal para agregar un cultivo.")}
@@ -497,16 +498,33 @@ function renderPozos(){
   $("pozoDetalle").hidden=true;$("pozoCards").hidden=false;let h="";
   for(const [c,n] of [["CP","Campo Plata"],["LST","LST"]]){
     h+=`<h2 style="margin-top:6px">${n}</h2>`;const list=pozoList(c);
-    if(!list.length){h+=`<div class="empty">Sin pozos todavía.</div>`;continue}
+    const nuevo=isAdmin()?`<div id="nv-${c}"><button class="btn sec" data-nuevo="${c}">＋ Agregar freatímetro en ${n}</button></div>`:"";
+    if(!list.length){h+=`<div class="empty">Sin pozos todavía.</div>`+nuevo;continue}
     for(const p of list){
       const ls=todas().filter(l=>l.pozoId===p.id).sort((a,b)=>tsOf(b)-tsOf(a)),l=ls[0],pv=ls[1],z=l?zona(l.profundidad):null;
       let d="";if(l&&pv){const df=Math.round((l.profundidad-pv.profundidad)*100);d=df<0?`<span class="up">▲ subió ${-df} cm</span>`:df>0?`<span class="down">▼ bajó ${df} cm</span>`:"sin cambio"}
       const dd=l?Math.floor((Date.now()-tsOf(l))/864e5):null,cr=cropOf(p.id);
-      h+=`<button class="card" data-p="${p.id}"><div><div class="id">${esc(p.nombre)}${p.fijada?" 🔒":""}</div><div class="sub">Lote ${esc(p.lote||"–")}</div></div>
+      h+=`<button class="card" data-p="${p.id}"><div><div class="id">${esc(p.nombre)}${p.fijada?" 🔒":""}</div><div class="sub">${esc(loteTxt(p.lote))}</div></div>
        <div>${z?`<span class="zone ${z.c}">${z.t}</span>`:`<span class="xs">Sin lecturas</span>`}${cr?`<div class="cr">${esc(cr.cultivo)} · ${dias(cr.fs,hoy())} DDS</div>`:""}<div class="xs">${dd==null?"":dd===0?"Medido hoy":`Hace ${dd} día${dd>1?"s":""}`}</div>${spark(p.id)}</div>
        <div><div class="val">${l?fmt(l.profundidad)+" m":"–"}</div><div class="d">${d}</div></div></button>`}
+    h+=nuevo;
   }
   $("pozoCards").innerHTML=h;$("pozoCards").querySelectorAll(".card").forEach(b=>b.onclick=()=>{st.detalle=b.dataset.p;renderPozos();window.scrollTo({top:0})});
+  $("pozoCards").querySelectorAll("[data-nuevo]").forEach(b=>b.onclick=()=>formNuevo(b.dataset.nuevo));
+}
+function formNuevo(c){
+  const box=$("nv-"+c);
+  box.innerHTML=`<div class="panel" style="border:2px solid var(--water)"><h2>Nuevo freatímetro · ${c==="CP"?"Campo Plata":"LST"}</h2>
+   <div class="row2"><label class="f">Nombre<input id="nv-nom" placeholder="Ej.: ${c}-L7"></label><label class="f">Lote<input id="nv-lote" placeholder="Ej.: Lote 7"></label></div>
+   <div class="xs">Después completás la ficha (altura del caño, ajuste de boya y ubicación) y la fijás.</div>
+   <div class="row2"><button class="btn sec" id="nv-no">Cancelar</button><button class="btn" id="nv-ok">Agregar</button></div><div id="nv-msg" hidden></div></div>`;
+  $("nv-no").onclick=()=>renderPozos();
+  $("nv-ok").onclick=async()=>{
+    const b=$("nv-ok");b.disabled=true;b.textContent="Agregando…";
+    try{const r=await api("agregarPozo",{campo:c,nombrePozo:$("nv-nom").value.trim(),lote:$("nv-lote").value.trim()});if(!r||!r.ok)throw r;
+      cfg.pozos.push(r.pozo);LS.set("cfg",cfg);st.detalle=r.pozo.id;renderPozos();window.scrollTo({top:0});
+    }catch(e){b.disabled=false;b.textContent="Agregar";showMsg("nv-msg","err","No se pudo agregar. Hace falta señal.")}
+  };
 }
 function ejeX(ls,W,L,R){const t0=tsOf(ls[0]),t1=tsOf(ls[ls.length-1]),span=Math.max(t1-t0,864e5);return{t0,t1,x:t=>L+(ls.length===1?(W-L-R)/2:(t-t0)/span*(W-L-R))}}
 const fl=t=>new Date(t).toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit"});
@@ -542,7 +560,7 @@ function renderDetalle(){
   $("pozoCards").hidden=true;const box=$("pozoDetalle");box.hidden=false;
   const ls=todas().filter(l=>l.pozoId===p.id&&l.profundidad!=null).sort((a,b)=>tsOf(a)-tsOf(b)),cr=cropOf(p.id);
   let h=`<button class="link" id="volver">← Todos los pozos</button>
-   <div class="panel"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap"><h2 style="font-size:20px;color:var(--fg);font-family:var(--mono)">${esc(p.nombre)}</h2><span class="xs">${p.campo==="CP"?"Campo Plata":"LST"} · Lote ${esc(p.lote||"–")}</span></div>
+   <div class="panel"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap"><h2 style="font-size:20px;color:var(--fg);font-family:var(--mono)">${esc(p.nombre)}</h2><span class="xs">${p.campo==="CP"?"Campo Plata":"LST"} · ${esc(loteTxt(p.lote))}</span></div>
    ${cr?`<div class="crop"><div><b>${esc(cr.cultivo)}</b> · FS ${fdate(cr.fs)}</div><div style="font-family:var(--mono)">${dias(cr.fs,hoy())} DDS</div></div>`:""}
    <h2>Napa y lluvia</h2>${chartNapa(ls,cr)}<h2>Estado del lote</h2>${chartEscalas(ls)}</div>`+fichaHtml(p);
   const rows=[...ls].reverse();
@@ -605,7 +623,7 @@ function renderMapa(){
   const ult=pid=>lastOf(pid);iniciarGPSMapa();
   $("mapaLista").innerHTML=con.map(p=>{const l=ult(p.id);return `<div class="card" style="grid-template-columns:auto 1fr auto;cursor:default">
      <span style="width:14px;height:14px;border-radius:50%;background:${colorZona(l&&l.profundidad)};display:inline-block"></span>
-     <div><div class="id">${esc(p.nombre)}</div><div class="sub">Lote ${esc(p.lote||"–")}${l?` · ${fmt(l.profundidad)} m (${fdate(l.fecha)})`:""}${distTxt(p)?` · a ${distTxt(p)}`:""}</div></div>
+     <div><div class="id">${esc(p.nombre)}</div><div class="sub">${esc(loteTxt(p.lote))}${l?` · ${fmt(l.profundidad)} m (${fdate(l.fecha)})`:""}${distTxt(p)?` · a ${distTxt(p)}`:""}</div></div>
      <a class="navbtn" href="${navUrl(p.lat,p.lng)}" target="_blank" rel="noopener">🚗 Cómo llegar</a></div>`}).join("")
     +(sin.length?`<div class="xs">Sin ubicación cargada: ${sin.map(p=>esc(p.nombre)).join(", ")}. ${isAdmin()?" Tocá uno para marcarlo en el mapa:":" La carga el administrador."}</div>${isAdmin()?`<div class="opts">${sin.map(p=>`<button class="opt" data-ubicar2="${esc(p.id)}">📌 Ubicar ${esc(p.nombre)}</button>`).join("")}</div>`:""}`:"");
   $("mapaLista").querySelectorAll("[data-ubicar2]").forEach(b=>b.onclick=()=>{empezarUbic(b.dataset.ubicar2);window.scrollTo({top:0,behavior:"smooth"})});
@@ -624,7 +642,7 @@ function renderMapa(){
     const ic=L.divIcon({className:"pin",html:`<div style="background:${colorZona(l&&l.profundidad)}"></div>`,iconSize:[22,22],iconAnchor:[11,11]});
     L.marker([p.lat,p.lng],{icon:ic}).addTo(capaPozos)
      .bindTooltip(esc(p.nombre),{permanent:true,direction:"top",offset:[0,-12],className:"pin-lbl"})
-     .bindPopup(`<div class="pop"><b>${esc(p.nombre)}</b><span>Lote ${esc(p.lote||"–")}${l?`<br>Última: <b style="font-size:14px">${fmt(l.profundidad)} m</b> el ${fdate(l.fecha)}`:"<br>Sin lecturas"}${distTxt(p)?`<br>Estás a ${distTxt(p)}`:""}</span>
+     .bindPopup(`<div class="pop"><b>${esc(p.nombre)}</b><span>${esc(loteTxt(p.lote))}${l?`<br>Última: <b style="font-size:14px">${fmt(l.profundidad)} m</b> el ${fdate(l.fecha)}`:"<br>Sin lecturas"}${distTxt(p)?`<br>Estás a ${distTxt(p)}`:""}</span>
        <a href="${navUrl(p.lat,p.lng)}" target="_blank" rel="noopener">🚗 Cómo llegar (Google Maps)</a><button data-cargar="${esc(p.id)}">📝 Cargar lectura</button>${isAdmin()?`<button data-ubicar="${esc(p.id)}" style="background:var(--surface);color:var(--fg);border:1.5px solid var(--line)">📌 Corregir ubicación</button>`:""}</div>`)});
   setTimeout(()=>MAP.invalidateSize(),60);
   iniciarGPSMapa();
