@@ -166,9 +166,10 @@ td.n{font-family:var(--mono);text-align:right}
     <h2>3 · Estado del lote</h2>
     <div id="cultivoActivo" class="crop" hidden></div>
     <div class="opts" id="estadoOpts"></div>
+    <label class="f" id="formaWrap" hidden>Forma de siembra<select id="forma"></select></label>
     <div id="nuevoCultivo" class="row2" hidden>
       <label class="f">Cultivo<select id="cultivo"></select></label>
-      <label class="f">Fecha de siembra (FS)<input type="date" id="fs"></label>
+      <label class="f"><span id="fsLbl">Fecha de siembra (FS)</span><input type="date" id="fs"></label>
     </div>
     <details id="addCropBox" hidden>
       <summary class="link">+ Agregar un cultivo a la lista (ej. cultivo de servicio)</summary>
@@ -230,8 +231,9 @@ td.n{font-family:var(--mono);text-align:right}
 const API = "https://script.google.com/macros/s/AKfycbyIRNotUIWkf0KXAKB4WhmY_2iWRm3pLJH4dXTHEZXkuD6h1PNpW9qIwfyS7dP9u7PC/exec"; // dirección de la aplicación web de Apps Script
 
 /* ======= escalas ======= */
-const ESTADOS=[{id:"barbecho_limpio",t:"Barbecho limpio",s:"Sin malezas"},{id:"barbecho_malezas",t:"Barbecho con malezas",s:"Malezas consumiendo"},{id:"barbecho_seco",t:"Barbecho seco",s:"Rastrojo, sin verde"},{id:"cultivo",t:"Sembrado",s:"Cargar cultivo y FS"}];
-const EST_TXT={barbecho_limpio:"Barbecho limpio",barbecho_malezas:"Barbecho con malezas",barbecho_seco:"Barbecho seco",cultivo:"Con cultivo"};
+const ESTADOS=[{id:"barbecho",t:"Barbecho",s:"Sin cultivo"},{id:"servicio",t:"Cultivo de servicio",s:"Cobertura"},{id:"cultivo",t:"Sembrado",s:"Cultivo de renta"}];
+const FORMAS=["Resiembra natural","Siembra aérea","Siembra terrestre"];
+const EST_TXT={barbecho:"Barbecho",servicio:"Cultivo de servicio",cultivo:"Sembrado",barbecho_limpio:"Barbecho limpio",barbecho_malezas:"Barbecho con malezas",barbecho_seco:"Barbecho seco"};
 const MALEZAS=[[1,"Sin malezas"],[2,"Pocas y chicas (< 5 cm)"],[3,"Muchas chicas, o pocas grandes"],[4,"Muchas grandes (> 15 cm)"],[5,"Enmalezado total"]];
 const VERDE=[[1,"Nada verde (0 %)"],[2,"Muy poco (< 10 %)"],[3,"Poco (10–30 %)"],[4,"Bastante (30–60 %)"],[5,"Mucho (> 60 %)"]];
 const COB=[[1,"Suelo desnudo (< 20 %)"],[2,"Poca (20–40 %)"],[3,"Media (40–60 %)"],[4,"Buena (60–80 %)"],[5,"Total (> 80 %)"]];
@@ -335,13 +337,14 @@ const nomPozo=id=>{const p=pozoBy(id);return p&&p.nombre?p.nombre:id};
 const loteTxt=(v,d="–")=>{v=String(v||"").trim();return !v?"Lote "+d:/^lote/i.test(v)?v:"Lote "+v};
 const extraOf=c=>(cfg.cultivos||[]).find(x=>x.nombre===c);
 function escalaDe(c){if(FENO[c])return FENO[c];const x=extraOf(c);if(!x||!ESCALAS_EXTRA[x.escala])return null;const b=ESCALAS_EXTRA[x.escala].base;return x.servicio?{escala:b.escala,e:[...b.e,["SEC","Secado (químico o rolado)"]]}:b}
-function cropOf(pid){const q=cola.filter(r=>r.pozoId===pid&&r.abreCultivo).pop();if(q)return{cultivo:q.cultivo,fs:q.fs,local:true};
+function cropOf(pid){const q=cola.filter(r=>r.pozoId===pid&&r.abreCultivo).pop();if(q)return{cultivo:q.cultivo,fs:q.fs,tipo:q.tipoCultivo||"cultivo",forma:q.formaSiembra||"",local:true};
   if(cola.some(r=>r.pozoId===pid&&r.cierraCultivo))return null;return cfg.activos&&cfg.activos[pid]||null}
 function fillCultivoSelect(){
   const prev=$("cultivo").value,base=Object.keys(FENO).filter(c=>c!=="Otro"),ex=cfg.cultivos||[];
   const serv=ex.filter(c=>c.servicio).map(c=>c.nombre),otros=ex.filter(c=>!c.servicio).map(c=>c.nombre);
-  $("cultivo").innerHTML=`<option value="">Elegir…</option><optgroup label="Cultivos de renta">${[...base,...otros].map(c=>`<option>${esc(c)}</option>`).join("")}</optgroup>`+(serv.length?`<optgroup label="Cultivos de servicio">${serv.map(c=>`<option>${esc(c)}</option>`).join("")}</optgroup>`:"")+`<optgroup label="Otros"><option>Otro</option></optgroup>`;
-  if(prev)$("cultivo").value=prev;
+  const op=l=>l.map(c=>`<option>${esc(c)}</option>`).join("");
+  $("cultivo").innerHTML=`<option value="">Elegir…</option>`+(st.estado==="servicio"?(serv.length?op(serv):`<option value="" disabled>Sin cultivos de servicio cargados</option>`):op([...base,...otros])+`<option>Otro</option>`);
+  if(prev&&[...$("cultivo").options].some(o=>o.value===prev))$("cultivo").value=prev;
 }
 function fillFeno(c){const f=escalaDe(c);if(!f){$("fenoWrap").hidden=true;$("estadio").innerHTML="";return}
   $("fenoWrap").hidden=false;$("fenoEscala").textContent="Escala "+f.escala;const prev=$("estadio").value;
@@ -387,18 +390,21 @@ function renderEstado(){
   $("addCropBox").hidden=true;
   if(crop){
     box.hidden=false;
-    box.innerHTML=`<div><b>${esc(crop.cultivo)}</b> · sembrado el ${fdate(crop.fs)}</div><div style="font-family:var(--mono)">${dias(crop.fs,$("fecha").value||hoy())} DDS (días desde siembra)</div>
-      <button class="link danger" id="cerrarCultivo">Cultivo cosechado: volver a barbecho</button>`;
-    $("estadoOpts").hidden=true;$("nuevoCultivo").hidden=true;st.estado="cultivo";fillFeno(crop.cultivo);
+    const sv=crop.tipo==="servicio",cerrarTxt=sv?"Cultivo de servicio terminado: volver a barbecho":"Cultivo cosechado: volver a barbecho";
+    box.innerHTML=`<div>${sv?"🌱 Cultivo de servicio: ":""}<b>${esc(crop.cultivo)}</b>${crop.forma?" · "+esc(crop.forma):""}${crop.fs?` · sembrado el ${fdate(crop.fs)}`:""}</div>${crop.fs?`<div style="font-family:var(--mono)">${dias(crop.fs,$("fecha").value||hoy())} DDS (días desde siembra)</div>`:""}
+      <button class="link danger" id="cerrarCultivo">${cerrarTxt}</button>`;
+    $("estadoOpts").hidden=true;$("nuevoCultivo").hidden=true;$("formaWrap").hidden=true;st.estado=sv?"servicio":"cultivo";fillFeno(crop.cultivo);
     const cb=$("cerrarCultivo");cb.onclick=()=>{
-      if(cb.dataset.armed!=="1"){cb.dataset.armed="1";cb.textContent="Tocá de nuevo para confirmar la cosecha";setTimeout(()=>{cb.dataset.armed="";cb.textContent="Cultivo cosechado: volver a barbecho"},5000);return}
+      if(cb.dataset.armed!=="1"){cb.dataset.armed="1";cb.textContent="Tocá de nuevo para confirmar la cosecha";setTimeout(()=>{cb.dataset.armed="";cb.textContent=cerrarTxt},5000);return}
       cerrarCultivo(st.pozo)};
   }else{
     box.hidden=true;$("estadoOpts").hidden=false;
     $("estadoOpts").innerHTML=ESTADOS.map(i=>`<button class="opt" aria-pressed="${st.estado===i.id}" data-v="${i.id}">${i.t}<small>${i.s}</small></button>`).join("");
     $("estadoOpts").querySelectorAll("button").forEach(b=>b.onclick=()=>{st.estado=st.estado===b.dataset.v?null:b.dataset.v;renderEstado()});
-    const n=st.estado==="cultivo";$("nuevoCultivo").hidden=!n;$("addCropBox").hidden=!(n&&isAdmin()&&!st.edit);
-    if(n)fillFeno($("cultivo").value);else $("fenoWrap").hidden=true;
+    const n=st.estado==="cultivo"||st.estado==="servicio",sv=st.estado==="servicio";
+    $("nuevoCultivo").hidden=!n;$("formaWrap").hidden=!sv;$("addCropBox").hidden=!(n&&isAdmin()&&!st.edit);$("nc-serv").checked=sv;
+    $("fsLbl").textContent=sv?"Fecha de siembra (opcional)":"Fecha de siembra (FS)";
+    if(n){if($("cultivo").dataset.tipo!==st.estado){$("cultivo").dataset.tipo=st.estado;fillCultivoSelect()}fillFeno($("cultivo").value)}else $("fenoWrap").hidden=true;
   }
 }
 async function cerrarCultivo(pid){
@@ -422,46 +428,49 @@ $("guardar").onclick=()=>{
   const prof=calc();if(prof<0){showMsg("formMsg","err","La profundidad da negativa: revisá la lectura de la vara.");return}
   const fecha=$("fecha").value||hoy(),hora=$("hora").value||ahora(),ed=st.edit,crop=ed?null:cropOf(p.id);
   let cultivo=null,fs=null,abre=false;
-  if(crop){cultivo=crop.cultivo;fs=crop.fs}
-  else if(st.estado==="cultivo"){cultivo=$("cultivo").value;fs=$("fs").value;
-    if(!cultivo||!fs){showMsg("formMsg","err","Para un lote sembrado cargá el cultivo y la fecha de siembra (FS).");return}
-    if(fs>fecha){showMsg("formMsg","err","La fecha de siembra no puede ser posterior a la lectura.");return}abre=!ed}
+  let tipo="",forma="";
+  if(!st.estado){showMsg("formMsg","err","Elegí el estado del lote: Barbecho, Cultivo de servicio o Sembrado.");return}
+  if(crop){cultivo=crop.cultivo;fs=crop.fs;tipo=crop.tipo||"cultivo";forma=crop.forma||""}
+  else if(st.estado==="cultivo"||st.estado==="servicio"){cultivo=$("cultivo").value;fs=$("fs").value;tipo=st.estado;forma=tipo==="servicio"?$("forma").value:"";
+    if(tipo==="servicio"&&(!cultivo||!forma)){showMsg("formMsg","err","Para un cultivo de servicio elegí la forma de siembra y el cultivo.");return}
+    if(tipo==="cultivo"&&(!cultivo||!fs)){showMsg("formMsg","err","Para un lote sembrado cargá el cultivo y la fecha de siembra (FS).");return}
+    if(fs&&fs>fecha){showMsg("formMsg","err","La fecha de siembra no puede ser posterior a la lectura.");return}abre=!ed}
   const num=id=>$(id).value===""?null:Number($(id).value),estadio=cultivo?$("estadio").value||"":"",esc2=cultivo&&escalaDe(cultivo);
   const r={id:ed?ed.id:"L"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),pozoId:p.id,campo:p.campo,lote:p.lote||"",fecha,hora,
     lecturaVara:lect,alturaCano:p.alturaCano??0,correccion:p.correccion||0,profundidad:prof,lluvia:num("lluvia"),
     estado:st.estado||"",estadoTxt:EST_TXT[st.estado]||"",malezas:num("malezas"),verde:num("verde"),cobertura:num("cob"),
-    cultivo:cultivo||"",fs:fs||"",dds:fs?dias(fs,fecha):null,estadio,escalaFeno:esc2?esc2.escala:"",obs:$("obs").value.trim(),
+    cultivo:cultivo||"",fs:fs||"",dds:fs?dias(fs,fecha):null,tipoCultivo:tipo,formaSiembra:forma,estadio,escalaFeno:esc2?esc2.escala:"",obs:$("obs").value.trim(),
     lat:ed?ed.lat:st.gps?Math.round(st.gps.lat*1e6)/1e6:null,lng:ed?ed.lng:st.gps?Math.round(st.gps.lng*1e6)/1e6:null,autor:ed?ed.autor:ses.nombre};
   if(abre)r.abreCultivo=true;
   const i=cola.findIndex(c=>c.id===r.id);
-  if(ed){if(i>=0){const prev=cola[i];if(prev.edit)r.edit=true;if(prev.abreCultivo&&r.cultivo)r.abreCultivo=true;cola[i]=r}else{r.edit=true;cola.push(r)}}
+  if(ed){if(i>=0){const prev=cola[i];if(prev.edit)r.edit=true;if(prev.abreCultivo&&r.cultivo&&!prev.edit)r.abreCultivo=true;cola[i]=r}else{r.edit=true;cola.push(r)}}
   else cola.push(r);
   LS.set("cola",cola);st.edit=null;
   const m=$("formMsg");m.hidden=false;m.className="msg ok";
-  m.innerHTML=`✓ ${ed?"Corregida":"Guardada"}: <b>${esc(p.nombre)}</b> · ${fmt(prof)} m${cultivo?` · ${esc(cultivo)} ${esc(estadio)} (${r.dds} DDS)`:""}. <button class="ed" id="reEdit">✏️ Editar</button>`;
+  m.innerHTML=`✓ ${ed?"Corregida":"Guardada"}: <b>${esc(p.nombre)}</b> · ${fmt(prof)} m${cultivo?` · ${esc(cultivo)} ${esc(estadio)}${r.dds!=null?` (${r.dds} DDS)`:""}`:""}. <button class="ed" id="reEdit">✏️ Editar</button>`;
   $("reEdit").onclick=()=>editar(r.id);
-  $("lectura").value="";$("lluvia").value="";$("obs").value="";["malezas","verde","cob","cultivo","estadio","fs"].forEach(id=>$(id).value="");
+  $("lectura").value="";$("lluvia").value="";$("obs").value="";["malezas","verde","cob","cultivo","estadio","fs","forma"].forEach(id=>$(id).value="");
   st.pozo=null;st.estado=null;st.gps=null;$("hora").value=ahora();renderForm();renderNet();window.scrollTo({top:0,behavior:"smooth"});
   if(navigator.onLine)sincronizar();
 };
 
 /* ======= editar una lectura ======= */
-const EST_ID=Object.fromEntries(Object.entries(EST_TXT).map(([k,v])=>[v,k]));
+const EST_ID={"Barbecho":"barbecho","Barbecho limpio":"barbecho","Barbecho con malezas":"barbecho","Barbecho seco":"barbecho","Cultivo de servicio":"servicio","Sembrado":"cultivo","Con cultivo":"cultivo",barbecho_limpio:"barbecho",barbecho_malezas:"barbecho",barbecho_seco:"barbecho"};
 const puedeEditar=l=>ses&&(isAdmin()||l.autor===ses.nombre);
 const btnEd=l=>puedeEditar(l)?`<button class="ed" data-ed="${esc(l.id)}">✏️ Editar</button>`:"";
 function bindEd(root){root.querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>editar(b.dataset.ed))}
-function limpiarForm(){$("lectura").value="";$("lluvia").value="";$("obs").value="";["malezas","verde","cob","cultivo","estadio","fs"].forEach(id=>$(id).value="");$("fecha").value=hoy();$("hora").value=ahora()}
+function limpiarForm(){$("lectura").value="";$("lluvia").value="";$("obs").value="";["malezas","verde","cob","cultivo","estadio","fs","forma"].forEach(id=>$(id).value="");$("fecha").value=hoy();$("hora").value=ahora()}
 function editar(id){
   const l=todas().find(x=>x.id===id);if(!l)return;
   if(!puedeEditar(l)){showMsg("formMsg","err","Solo puede editar quien cargó la lectura o el administrador.");return}
   limpiarForm();$("formMsg").hidden=true;
   st.edit={id:l.id,lat:l.lat??null,lng:l.lng??null,autor:l.autor||ses.nombre,fecha:l.fecha,hora:l.hora,pozo:l.pozoId};
   st.campo=l.campo||"CP";st.pozo=l.pozoId;st.gps=null;
-  st.estado=l.cultivo?"cultivo":(EST_ID[l.estado]||l.estado||null);
+  st.estado=EST_ID[l.estado]||l.estado||(l.cultivo?"cultivo":null);if(st.estado==="cultivo"&&l.tipoCultivo==="servicio")st.estado="servicio";
   $("fecha").value=l.fecha||hoy();$("hora").value=l.hora||"";
   const v=(id,x)=>{$(id).value=x==null?"":String(x)};
   v("lectura",l.lecturaVara);v("lluvia",l.lluvia);v("malezas",l.malezas);v("verde",l.verde);v("cob",l.cobertura);v("obs",l.obs);
-  if(l.cultivo){fillCultivoSelect();$("cultivo").value=l.cultivo;$("fs").value=l.fs||""}
+  if(l.cultivo){$("cultivo").dataset.tipo=st.estado;fillCultivoSelect();$("cultivo").value=l.cultivo;$("fs").value=l.fs||"";$("forma").value=l.formaSiembra||""}
   st.detalle=null;setView("cargar");
   if(l.cultivo){fillFeno(l.cultivo);$("estadio").value=l.estadio||""}
   calc();window.scrollTo({top:0,behavior:"smooth"});
@@ -505,7 +514,7 @@ function renderPozos(){
       let d="";if(l&&pv){const df=Math.round((l.profundidad-pv.profundidad)*100);d=df<0?`<span class="up">▲ subió ${-df} cm</span>`:df>0?`<span class="down">▼ bajó ${df} cm</span>`:"sin cambio"}
       const dd=l?Math.floor((Date.now()-tsOf(l))/864e5):null,cr=cropOf(p.id);
       h+=`<button class="card" data-p="${p.id}"><div><div class="id">${esc(p.nombre)}${p.fijada?" 🔒":""}</div><div class="sub">${esc(loteTxt(p.lote))}</div></div>
-       <div>${z?`<span class="zone ${z.c}">${z.t}</span>`:`<span class="xs">Sin lecturas</span>`}${cr?`<div class="cr">${esc(cr.cultivo)} · ${dias(cr.fs,hoy())} DDS</div>`:""}<div class="xs">${dd==null?"":dd===0?"Medido hoy":`Hace ${dd} día${dd>1?"s":""}`}</div>${spark(p.id)}</div>
+       <div>${z?`<span class="zone ${z.c}">${z.t}</span>`:`<span class="xs">Sin lecturas</span>`}${cr?`<div class="cr">${cr.tipo==="servicio"?"🌱 ":""}${esc(cr.cultivo)}${cr.fs?` · ${dias(cr.fs,hoy())} DDS`:""}</div>`:""}<div class="xs">${dd==null?"":dd===0?"Medido hoy":`Hace ${dd} día${dd>1?"s":""}`}</div>${spark(p.id)}</div>
        <div><div class="val">${l?fmt(l.profundidad)+" m":"–"}</div><div class="d">${d}</div></div></button>`}
     h+=nuevo;
   }
@@ -561,7 +570,7 @@ function renderDetalle(){
   const ls=todas().filter(l=>l.pozoId===p.id&&l.profundidad!=null).sort((a,b)=>tsOf(a)-tsOf(b)),cr=cropOf(p.id);
   let h=`<button class="link" id="volver">← Todos los pozos</button>
    <div class="panel"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap"><h2 style="font-size:20px;color:var(--fg);font-family:var(--mono)">${esc(p.nombre)}</h2><span class="xs">${p.campo==="CP"?"Campo Plata":"LST"} · ${esc(loteTxt(p.lote))}</span></div>
-   ${cr?`<div class="crop"><div><b>${esc(cr.cultivo)}</b> · FS ${fdate(cr.fs)}</div><div style="font-family:var(--mono)">${dias(cr.fs,hoy())} DDS</div></div>`:""}
+   ${cr?`<div class="crop"><div>${cr.tipo==="servicio"?"🌱 Cultivo de servicio: ":""}<b>${esc(cr.cultivo)}</b>${cr.forma?" · "+esc(cr.forma):""}${cr.fs?` · FS ${fdate(cr.fs)}`:""}</div>${cr.fs?`<div style="font-family:var(--mono)">${dias(cr.fs,hoy())} DDS</div>`:""}</div>`:""}
    <h2>Napa y lluvia</h2>${chartNapa(ls,cr)}<h2>Estado del lote</h2>${chartEscalas(ls)}</div>`+fichaHtml(p);
   const rows=[...ls].reverse();
   h+=`<div class="panel"><h2>Lecturas</h2><div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Napa</th><th>Lluvia</th><th>Estado / cultivo</th><th>DDS</th><th>Mal.</th><th>Verde</th><th>Rastr.</th><th>Cargó</th><th>Obs.</th><th></th></tr></thead><tbody>${
@@ -705,7 +714,7 @@ $("btnCsv").onclick=()=>{
 
 /* ======= arranque ======= */
 $("fecha").value=hoy();$("hora").value=ahora();
-fillSel("malezas",MALEZAS);fillSel("verde",VERDE);fillSel("cob",COB);fillCultivoSelect();renderNet();boot();
+$("forma").innerHTML=`<option value="">Elegir…</option>`+FORMAS.map(f=>`<option>${f}</option>`).join("");fillSel("malezas",MALEZAS);fillSel("verde",VERDE);fillSel("cob",COB);fillCultivoSelect();renderNet();boot();
 
 </script>
 </body>
