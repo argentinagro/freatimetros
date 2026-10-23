@@ -368,7 +368,7 @@ function renderGps(err){
 }
 
 /* ======= formulario ======= */
-const lastOf=pid=>todas().filter(l=>l.pozoId===pid).sort((a,b)=>tsOf(b)-tsOf(a))[0];
+const lastOf=pid=>todas().filter(l=>l.pozoId===pid&&l.profundidad!=null).sort((a,b)=>tsOf(b)-tsOf(a))[0];
 function pozoList(c){return cfg.pozos.filter(p=>p.campo===c)}
 function renderForm(){
   $("campoSeg").innerHTML=[["CP","Campo Plata"],["LST","LST"]].map(([id,n])=>`<button class="opt" style="text-align:center" aria-pressed="${st.campo===id}" data-c="${id}">${n}</button>`).join("");
@@ -522,7 +522,7 @@ function renderPozos(){
     const nuevo=isAdmin()?`<div id="nv-${c}"><button class="btn sec" data-nuevo="${c}">＋ Agregar freatímetro en ${n}</button></div>`:"";
     if(!list.length){h+=`<div class="empty">Sin pozos todavía.</div>`+nuevo;continue}
     for(const p of list){
-      const ls=todas().filter(l=>l.pozoId===p.id).sort((a,b)=>tsOf(b)-tsOf(a)),l=ls[0],pv=ls[1],z=l?zona(l.profundidad):null;
+      const ls=todas().filter(l=>l.pozoId===p.id&&l.profundidad!=null).sort((a,b)=>tsOf(b)-tsOf(a)),l=ls[0],pv=ls[1],z=l?zona(l.profundidad):null;
       let d="";if(l&&pv){const df=Math.round((l.profundidad-pv.profundidad)*100);d=df<0?`<span class="up">▲ subió ${-df} cm</span>`:df>0?`<span class="down">▼ bajó ${df} cm</span>`:"sin cambio"}
       const dd=l?Math.floor((Date.now()-tsOf(l))/864e5):null,cr=cropOf(p.id);
       h+=`<button class="card" data-p="${p.id}"><div><div class="id">${esc(p.nombre)}${p.fijada?" 🔒":""}</div><div class="sub">${esc(loteTxt(p.lote))}</div></div>
@@ -559,8 +559,9 @@ function chartNapa(ls,crop){
   if(crop&&ls.length>1){const ts=new Date(crop.fs+"T12:00").getTime();if(ts>=t0&&ts<=t1){const xs=x(ts);g+=`<line x1="${xs}" x2="${xs}" y1="${T}" y2="${H-B}" stroke="var(--crop)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="${xs+4}" y="${T+12}" font-size="11" fill="var(--crop)">Siembra</text>`}}
   ls.forEach(l=>{if(l.lluvia){const xx=x(tsOf(l));g+=`<rect x="${xx-5}" y="${yr(l.lluvia)}" width="10" height="${H-B-yr(l.lluvia)}" fill="var(--soil)" opacity=".55"/>`}});
   g+=`<text x="${W-R+6}" y="${H-B+4}" font-size="10" fill="var(--soil)">0</text><text x="${W-R+6}" y="${yr(maxR)+4}" font-size="10" fill="var(--soil)">${maxR}mm</text>`;
-  g+=`<polyline points="${ls.map(l=>`${x(tsOf(l)).toFixed(1)},${y(l.profundidad).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--water)" stroke-width="2.4"/>`;
-  ls.forEach((l,i)=>{g+=`<circle cx="${x(tsOf(l))}" cy="${y(l.profundidad)}" r="${i===ls.length-1?5:3.2}" fill="var(--water)" stroke="var(--surface)" stroke-width="1.5"/>`});
+  const lp=ls.filter(l=>l.profundidad!=null);
+  g+=`<polyline points="${lp.map(l=>`${x(tsOf(l)).toFixed(1)},${y(l.profundidad).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--water)" stroke-width="2.4"/>`;
+  lp.forEach((l,i)=>{g+=`<circle cx="${x(tsOf(l))}" cy="${y(l.profundidad)}" r="${i===lp.length-1?5:3.2}" fill="var(--water)" stroke="var(--surface)" stroke-width="1.5"/>`});
   g+=`<text x="${x(t0)}" y="${H-14}" font-size="11" fill="var(--muted)">${fl(t0)}</text>`+(ls.length>1?`<text x="${x(t1)}" y="${H-14}" font-size="11" fill="var(--muted)" text-anchor="end">${fl(t1)}</text>`:"");
   g+=`<text x="${L}" y="${H-1}" font-size="10" fill="var(--muted)">Línea azul: napa (más abajo = más profunda) · Barras: lluvia (mm)</text>`;
   return `<svg class="chart" viewBox="0 0 ${W} ${H}">${g}</svg>`;
@@ -583,11 +584,11 @@ function chartEscalas(ls){
 function renderDetalle(){
   const p=pozoBy(st.detalle);if(!p){st.detalle=null;renderPozos();return}
   $("pozoCards").hidden=true;const box=$("pozoDetalle");box.hidden=false;
-  const ls=todas().filter(l=>l.pozoId===p.id&&l.profundidad!=null).sort((a,b)=>tsOf(a)-tsOf(b)),cr=cropOf(p.id);
+  const ls=todas().filter(l=>l.pozoId===p.id&&(l.profundidad!=null||l.lluvia!=null)).sort((a,b)=>tsOf(a)-tsOf(b)),cr=cropOf(p.id);
   let h=`<button class="link" id="volver">← Todos los pozos</button>
    <div class="panel"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap"><h2 style="font-size:20px;color:var(--fg);font-family:var(--mono)">${esc(p.nombre)}</h2><span class="xs">${p.campo==="CP"?"Campo Plata":"LST"} · ${esc(loteTxt(p.lote))}</span></div>
    ${cr?`<div class="crop"><div>${cr.tipo==="servicio"?"🌱 Cultivo de servicio: ":""}<b>${esc(cr.cultivo)}</b>${cr.forma?" · "+esc(cr.forma):""}${cr.fs?` · FS ${fdate(cr.fs)}`:""}</div>${cr.fs?`<div style="font-family:var(--mono)">${dias(cr.fs,hoy())} DDS</div>`:""}</div>`:""}
-   <h2>Napa y lluvia</h2>${chartNapa(ls,cr)}<h2>Estado del lote</h2>${chartEscalas(ls)}</div>`+fichaHtml(p);
+   <h2>Napa y lluvia</h2>${chartNapa(ls,cr)}<h2>Estado del lote</h2>${chartEscalas(ls.filter(l=>l.profundidad!=null))}</div>`+fichaHtml(p);
   const rows=[...ls].reverse();
   h+=`<div class="panel"><h2>Lecturas</h2><div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Napa</th><th>Lluvia</th><th>Estado / cultivo</th><th>DDS</th><th>Mal.</th><th>Verde</th><th>Rastr.</th><th>IAF</th><th>Cargó</th><th>Obs.</th><th></th></tr></thead><tbody>${
    rows.map(l=>`<tr><td>${fdate(l.fecha)}${l._local?" ⏳":""}</td><td class="n">${fmt(l.profundidad)}</td><td class="n">${l.lluvia??"–"}</td><td>${esc(l.cultivo?l.cultivo+" "+(l.estadio||""):(EST_TXT[l.estado]||l.estado||"–"))}</td><td class="n">${l.dds??"–"}</td><td class="n">${l.malezas??"–"}</td><td class="n">${l.verde??"–"}</td><td class="n">${l.cobertura??"–"}</td><td class="n">${l.iaf??"–"}</td><td>${esc(l.autor||"")}</td><td>${esc(l.obs||"")}</td><td>${btnEd(l)}</td></tr>`).join("")||`<tr><td colspan="12" class="xs">Sin lecturas</td></tr>`}</tbody></table></div><div class="xs">⏳ = guardada en el teléfono, falta subir.</div></div>`;
