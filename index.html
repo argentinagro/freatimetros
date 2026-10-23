@@ -603,15 +603,15 @@ function fichaHtml(p){
    <tr><th>Ajuste de la boya</th><td class="n">${p.correccion?(p.correccion>0?"+":"")+fmt(p.correccion)+" m":"0"}</td></tr>
    <tr><th>Profundidad total del caño</th><td class="n">${p.profTotal!=null?fmt(p.profTotal)+" m":"–"}</td></tr>
    <tr><th>Ubicación</th><td>${p.lat!=null?`<a href="${mapa(p.lat,p.lng)}" target="_blank" rel="noopener">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</a>`:"<span class='danger'>falta</span>"}</td></tr></tbody></table></div>`;
-  if(p.fijada)return `<div class="panel"><h2>🔒 Ficha fija</h2>${datos}<div class="xs">Fijada el ${fdate(p.fijadaEl)}.</div>${isAdmin()?`<button class="link danger" id="f-unlock">Desbloquear para corregir</button>`:""}<div id="f-msg" hidden></div></div>`;
+  if(p.fijada)return `<div class="panel"><h2>🔒 Ficha fija</h2>${datos}<div class="xs">Fijada el ${fdate(p.fijadaEl)}.</div>${isAdmin()?`<button class="btn sec" id="f-mapa">📌 Corregir ubicación en el mapa</button><button class="link danger" id="f-unlock">Desbloquear para corregir</button>`:""}<div id="f-msg" hidden></div></div>`;
   if(!isAdmin())return `<div class="panel"><h2>Ficha del pozo</h2>${datos}<div class="xs">La ficha la completa el administrador.</div></div>`;
   return `<div class="panel"><h2>Ficha del pozo · sin fijar</h2>
    <div class="row2"><label class="f">Nombre<input id="f-nombre" value="${esc(p.nombre)}"></label><label class="f">Lote<input id="f-lote" value="${esc(p.lote||"")}"></label></div>
    <div class="row2"><label class="f">Altura del caño (m)<span class="h">Cuánto sobresale del suelo</span><input id="f-alt" type="number" inputmode="decimal" step="0.01" value="${p.alturaCano??""}"></label>
    <label class="f">Ajuste de la boya (m)<span class="h">Se suma a la vara (+ si marca de menos)</span><input id="f-corr" type="number" inputmode="decimal" step="0.01" value="${p.correccion??0}"></label></div>
    <label class="f">Profundidad total del caño (m)<input id="f-tot" type="number" inputmode="decimal" step="0.1" value="${p.profTotal??""}"></label>
-   <label class="f">Ubicación (latitud, longitud)<span class="h">Desde Google Maps: mantené apretado sobre el pozo, tocá las coordenadas que aparecen arriba para copiarlas y pegalas acá. También podés marcarlo en la pestaña Mapa.</span><input id="f-coords" placeholder="-27.61234, -61.34567" value="${p.lat!=null?p.lat+", "+p.lng:""}"></label>
-   <div class="row2"><button class="btn sec" id="f-gps">📍 Mi ubicación actual</button><a class="btn sec" style="text-align:center;text-decoration:none" href="${p.lat!=null?`https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`:"https://www.google.com/maps/@-27.61,-61.35,14z/data=!3m1!1e3"}" target="_blank" rel="noopener">🗺️ Abrir Google Maps</a></div>
+   <label class="f">Ubicación (latitud, longitud)<span class="h">Parado al lado del caño: «Mi ubicación actual». Desde la oficina: «Marcar en el mapa» y tocás el caño sobre la foto satelital.</span><input id="f-coords" placeholder="-27.61234, -61.34567" value="${p.lat!=null?p.lat+", "+p.lng:""}"></label>
+   <div class="row2"><button class="btn sec" id="f-gps">📍 Mi ubicación actual</button><button class="btn sec" id="f-mapa">📌 Marcar en el mapa</button></div>
    <div id="f-cok" class="xs"></div>
    <div class="row2"><button class="btn sec" id="f-save">Guardar borrador</button><button class="btn" id="f-fix">Guardar y fijar 🔒</button></div>
    <div id="f-msg" hidden></div></div>`;
@@ -619,6 +619,7 @@ function fichaHtml(p){
 function bindFicha(p){
   const u=$("f-unlock");if(u)u.onclick=async()=>{if(u.dataset.armed!=="1"){u.dataset.armed="1";u.textContent="Tocá de nuevo para desbloquear";return}
     try{const r=await api("guardarPozo",{pozo:{id:p.id},desbloquear:true});if(!r.ok)throw 0;p.fijada=false;LS.set("cfg",cfg);renderDetalle()}catch(e){showMsg("f-msg","err","Hace falta señal.")}};
+  const fm=$("f-mapa");if(fm)fm.onclick=()=>{setView("mapa");window.scrollTo({top:0});let n=0;const t=setInterval(()=>{if(MAP||++n>60){clearInterval(t);if(MAP){MAP.invalidateSize();empezarUbic(p.id)}}},250)};
   if(!$("f-save"))return;
   const showC=()=>{const c=parseCoords($("f-coords").value);$("f-cok").innerHTML=!$("f-coords").value.trim()?"":c?`✓ ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)} · <a href="${mapa(c.lat,c.lng)}" target="_blank" rel="noopener">ver en el mapa</a>`:`<span class="danger">Coordenadas no válidas.</span>`};
   $("f-coords").addEventListener("input",showC);showC();
