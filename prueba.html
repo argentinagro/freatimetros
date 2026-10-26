@@ -178,8 +178,8 @@ td.n{font-family:var(--mono);text-align:right}
         <button class="btn sec" id="nc-save">Agregar a la lista</button><div id="nc-msg" hidden></div>
       </div>
     </details>
-    <label class="f" id="fenoWrap" hidden>Estadio fenológico<span class="h" id="fenoEscala"></span><select id="estadio"></select></label>
-    <label class="f" id="wIaf" hidden>IAF – índice de área foliar (1 a 10)<span class="h">Cuánto cubre el cultivo con hojas: 1 = recién emergido, 10 = cubre todo el entresurco</span><select id="iaf"></select></label>
+    <label class="f" id="fenoWrap" hidden>Estadio fenológico<span class="h" id="fenoEscala"></span><select id="estadio"></select><div class="xs" id="corteH" hidden>✂️ Con <b>Corte</b> se da por terminado el cultivo de servicio: al guardar, el lote vuelve a barbecho.</div></label>
+    <label class="f" id="wIaf" hidden>IAF – índice de área foliar (0 a 10)<span class="h">Cuánto cubre el cultivo con hojas verdes: 0 = sin hojas verdes (recién sembrado sin emerger, o cultivo terminado: corte o madurez), 1 = recién emergido, 10 = cubre todo el entresurco</span><select id="iaf"></select></label>
     <label class="f" id="wMal">Malezas<span class="h">Tamaño y cantidad de malezas vivas</span><select id="malezas"></select></label>
     <label class="f" id="wVer">Verde activo<span class="h">Superficie verde transpirando (malezas o cultivo)</span><select id="verde"></select></label>
     <label class="f" id="wCob">Cobertura de rastrojo<span class="h" id="cobH">Suelo tapado por residuos secos</span><select id="cob"></select></label>
@@ -214,7 +214,7 @@ td.n{font-family:var(--mono);text-align:right}
 
 <!-- HISTORIAL -->
 <section id="v-hist" hidden>
-  <div class="seg" id="histFiltro"></div>
+  <div class="seg" id="histFiltro" style="grid-template-columns:1fr 1fr 1fr"></div>
   <div class="panel">
     <div id="histInfo" class="xs"></div>
     <button class="btn sec" id="btnSync">Actualizar ahora</button>
@@ -251,7 +251,7 @@ const ESCALAS_EXTRA={zadoks:{nombre:"Zadoks – gramíneas (centeno, avena, ceba
 /* ======= almacenamiento local ======= */
 const LS={get(k,d){try{const v=localStorage.getItem("frp_"+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem("frp_"+k,JSON.stringify(v))}catch(e){}}};
 let ses=LS.get("ses",null), cfg=LS.get("cfg",{pozos:[],cultivos:[],activos:{}}), lecturas=LS.get("lecturas",[]), cola=LS.get("cola",[]);
-const st={campo:"CP",pozo:null,estado:null,view:"cargar",hist:"CP",detalle:null,gps:null,online:navigator.onLine,edit:null};
+const st={campo:"CP",pozo:null,estado:null,view:"cargar",hist:"T",detalle:null,gps:null,online:navigator.onLine,edit:null};
 const $=id=>document.getElementById(id);
 const fmt=(n,d=2)=>n==null||n===""||isNaN(n)?"–":Number(n).toFixed(d).replace(".",",");
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -335,7 +335,10 @@ const pozoBy=id=>cfg.pozos.find(p=>p.id===id);
 const nomPozo=id=>{const p=pozoBy(id);return p&&p.nombre?p.nombre:id};
 const loteTxt=(v,d="–")=>{v=String(v||"").trim();return !v?"Lote "+d:/^lote/i.test(v)?v:"Lote "+v};
 const extraOf=c=>(cfg.cultivos||[]).find(x=>x.nombre===c);
-function escalaDe(c){if(FENO[c])return FENO[c];const x=extraOf(c);if(!x||!ESCALAS_EXTRA[x.escala])return null;const b=ESCALAS_EXTRA[x.escala].base;return x.servicio?{escala:b.escala,e:[...b.e,["SEC","Secado (químico o rolado)"]]}:b}
+function escalaDe(c){if(FENO[c])return FENO[c];const x=extraOf(c);if(!x||!ESCALAS_EXTRA[x.escala])return null;const b=ESCALAS_EXTRA[x.escala].base;return x.servicio?{escala:b.escala,e:[...b.e,CORTE]}:b}
+const CORTE=["CORTE","Corte: secado químico o mecánico (fin del ciclo)"];
+const esCorte=e=>e==="CORTE"||e==="SEC";
+const esFin=(c,e)=>{if(!e)return false;if(esCorte(e))return true;const f=escalaDe(c),x=f&&f.e.find(y=>y[0]===e);return !!x&&/madurez fisiol|madurez de cosecha|defoliado/i.test(x[1])};
 function cropOf(pid){const q=cola.filter(r=>r.pozoId===pid&&r.abreCultivo).pop();if(q)return{cultivo:q.cultivo,fs:q.fs,tipo:q.tipoCultivo||"cultivo",forma:q.formaSiembra||"",local:true};
   if(cola.some(r=>r.pozoId===pid&&r.cierraCultivo))return null;return cfg.activos&&cfg.activos[pid]||null}
 function fillCultivoSelect(){
@@ -345,7 +348,7 @@ function fillCultivoSelect(){
   $("cultivo").innerHTML=`<option value="">Elegir…</option>`+(st.estado==="servicio"?(serv.length?op(serv):`<option value="" disabled>Sin cultivos de servicio cargados</option>`):op([...base,...otros])+`<option>Otro</option>`);
   if(prev&&[...$("cultivo").options].some(o=>o.value===prev))$("cultivo").value=prev;
 }
-function fillFeno(c){const f=escalaDe(c);if(!f){$("fenoWrap").hidden=true;$("estadio").innerHTML="";return}
+function fillFeno(c){let f=escalaDe(c);if(f&&st.estado==="servicio"&&!f.e.some(x=>esCorte(x[0])))f={escala:f.escala,e:[...f.e,CORTE]};if(!f){$("fenoWrap").hidden=true;$("estadio").innerHTML="";return}
   $("fenoWrap").hidden=false;$("fenoEscala").textContent="Escala "+f.escala;const prev=$("estadio").value;
   $("estadio").innerHTML=`<option value="">Elegir estadio…</option>`+f.e.map(([k,t])=>`<option value="${k}">${k} – ${esc(t)}</option>`).join("");
   if(f.e.some(x=>x[0]===prev))$("estadio").value=prev}
@@ -413,12 +416,12 @@ async function cerrarCultivo(pid){
   catch(e){showMsg("formMsg","info","Se cierra el cultivo en el servidor la próxima vez que haya señal.");LS.set("cierres",[...LS.get("cierres",[]),{pozoId:pid,fecha:hoy()}])}
   st.estado=null;renderEstado();
 }
-const REPRO=/^(R\d|R-|VT|E[4-9]|Z(4[5-9]|[5-9]\d)|PP|1F|PF|NAWF|1CA|60CA|DEF|IF|VA|SEC)/;
+const REPRO=/^(R\d|R-|VT|E[4-9]|Z(4[5-9]|[5-9]\d)|PP|1F|PF|NAWF|1CA|60CA|DEF|IF|VA|SEC|CORTE)/;
 const conCult=()=>st.estado==="cultivo"||st.estado==="servicio";
 function cobVisible(){
   if(!conCult())return true;
   const crop=st.pozo&&!st.edit?cropOf(st.pozo):null,c=crop?crop.cultivo:$("cultivo").value,e=$("estadio").value,f=escalaDe(c);
-  if(!f||!e)return true;
+  if(!f||!e||esCorte(e))return true;
   const i=f.e.findIndex(x=>x[0]===e);let r=f.e.findIndex(x=>REPRO.test(x[0]));if(r<0)r=f.e.length;
   return i>=0&&i<=Math.floor((r-1)/2);
 }
@@ -432,12 +435,16 @@ function calc(){
   const r=isNaN(l)?null:Math.round((l-a+corr)*100)/100;
   $("prof").textContent=r==null?"–":fmt(r)+" m";const z=zona(r);$("profZone").innerHTML=z?`<span class="zone ${z.c}">${z.t}</span>`:"";return r;
 }
-$("lectura").addEventListener("input",calc);$("fecha").addEventListener("change",renderEstado);$("cultivo").addEventListener("change",()=>{fillFeno($("cultivo").value);visibles()});$("estadio").addEventListener("change",visibles);
+$("lectura").addEventListener("input",calc);$("fecha").addEventListener("change",renderEstado);$("cultivo").addEventListener("change",()=>{fillFeno($("cultivo").value);visibles()});$("estadio").addEventListener("change",()=>{visibles();const crop=st.pozo&&!st.edit?cropOf(st.pozo):null,c=crop?crop.cultivo:$("cultivo").value,e=$("estadio").value;if(esFin(c,e)&&$("iaf").value==="")$("iaf").value="0";$("corteH").hidden=!(esCorte(e)&&!st.edit)});
 
 $("guardar").onclick=()=>{
   const p=pozoBy(st.pozo),lect=parseFloat($("lectura").value);
   if(!p){showMsg("formMsg","err","Elegí el freatímetro.");return}
   if(isNaN(lect)){showMsg("formMsg","err","Falta la lectura de la vara.");$("lectura").focus();return}
+  if(lect>6){showMsg("formMsg","err",`La lectura de la vara va en metros. ¿Pusiste centímetros? Por ejemplo, 210 cm se carga como 2,10.`);$("lectura").focus();return}
+  if(!st.edit){const fch=$("fecha").value||hoy(),dup=todas().find(l=>l.pozoId===p.id&&l.fecha===fch&&l.profundidad!=null);
+    if(dup&&st.dupOk!==dup.id){const m=$("formMsg");m.hidden=false;m.className="msg err";m.innerHTML=`${esc(p.nombre)} ya tiene una lectura con fecha ${fdate(fch)} (${fmt(dup.profundidad)} m). ¿Querés corregir esa en vez de cargar otra? <button class="ed" id="dupEd">✏️ Corregir esa</button> <button class="ed" id="dupOk">Cargar otra igual</button>`;
+      $("dupEd").onclick=()=>editar(dup.id);$("dupOk").onclick=()=>{st.dupOk=dup.id;$("guardar").click()};return}}
   const prof=calc();if(prof<0){showMsg("formMsg","err","La profundidad da negativa: revisá la lectura de la vara.");return}
   const fecha=$("fecha").value||hoy(),hora=$("hora").value||ahora(),ed=st.edit,crop=ed?null:cropOf(p.id);
   let cultivo=null,fs=null,abre=false;
@@ -455,12 +462,14 @@ $("guardar").onclick=()=>{
     cultivo:cultivo||"",fs:fs||"",dds:fs?dias(fs,fecha):null,tipoCultivo:tipo,formaSiembra:forma,estadio,escalaFeno:esc2?esc2.escala:"",obs:$("obs").value.trim(),
     lat:ed?ed.lat:st.gps?Math.round(st.gps.lat*1e6)/1e6:null,lng:ed?ed.lng:st.gps?Math.round(st.gps.lng*1e6)/1e6:null,autor:ed?ed.autor:ses.nombre};
   if(abre)r.abreCultivo=true;
+  const corte=!ed&&tipo==="servicio"&&esCorte(estadio);if(corte)r.cierraCultivo=true;
   const i=cola.findIndex(c=>c.id===r.id);
   if(ed){if(i>=0){const prev=cola[i];if(prev.edit)r.edit=true;if(prev.abreCultivo&&r.cultivo&&!prev.edit)r.abreCultivo=true;cola[i]=r}else{r.edit=true;cola.push(r)}}
   else cola.push(r);
-  LS.set("cola",cola);st.edit=null;
+  LS.set("cola",cola);st.edit=null;st.dupOk=null;
+  if(corte){if(cfg.activos)delete cfg.activos[p.id];LS.set("cfg",cfg);LS.set("cierres",[...LS.get("cierres",[]).filter(x=>x.pozoId!==p.id),{pozoId:p.id,fecha}])}
   const m=$("formMsg");m.hidden=false;m.className="msg ok";
-  m.innerHTML=`✓ ${ed?"Corregida":"Guardada"}: <b>${esc(p.nombre)}</b> · ${fmt(prof)} m${cultivo?` · ${esc(cultivo)} ${esc(estadio)}${r.dds!=null?` (${r.dds} DDS)`:""}`:""}. <button class="ed" id="reEdit">✏️ Editar</button>`;
+  m.innerHTML=`✓ ${ed?"Corregida":"Guardada"}: <b>${esc(p.nombre)}</b> · ${fmt(prof)} m${cultivo?` · ${esc(cultivo)} ${esc(estadio)}${r.dds!=null?` (${r.dds} DDS)`:""}`:""}${corte?" · ✂️ cultivo de servicio terminado, el lote vuelve a barbecho":""}. <button class="ed" id="reEdit">✏️ Editar</button>`;
   $("reEdit").onclick=()=>editar(r.id);
   $("lectura").value="";$("lluvia").value="";$("obs").value="";["malezas","verde","cob","iaf","cultivo","estadio","fs","forma"].forEach(id=>$(id).value="");
   st.pozo=null;st.estado=null;st.gps=null;$("hora").value=ahora();renderForm();renderNet();window.scrollTo({top:0,behavior:"smooth"});
@@ -574,13 +583,13 @@ function chartEscalas(ls){
   const se=[["malezas","var(--bad)","Malezas"],["verde","var(--crop)","Verde activo"],["cobertura","var(--soil)","Rastrojo"]];
   se.forEach(([k,col],i)=>{const pts=ls.filter(l=>l[k]!=null);if(pts.length>1)g+=`<polyline points="${pts.map(l=>`${x(tsOf(l)).toFixed(1)},${(y(l[k])+(i-1)*2.5).toFixed(1)}`).join(" ")}" fill="none" stroke="${col}" stroke-width="2.2"/>`;
     pts.forEach(l=>g+=`<circle cx="${x(tsOf(l))}" cy="${y(l[k])+(i-1)*2.5}" r="3.6" fill="${col}"/>`)});
-  const yi=v=>T+(10-v)/9*(H-T-B),pi=ls.filter(l=>l.iaf!=null);
-  if(pi.length){[1,5,10].forEach(v=>g+=`<text x="${W-R+6}" y="${yi(v)+4}" font-size="11" fill="var(--water)">${v}</text>`);
+  const yi=v=>T+(10-v)/10*(H-T-B),pi=ls.filter(l=>l.iaf!=null);
+  if(pi.length){[0,5,10].forEach(v=>g+=`<text x="${W-R+6}" y="${yi(v)+4}" font-size="11" fill="var(--water)">${v}</text>`);
     if(pi.length>1)g+=`<polyline points="${pi.map(l=>`${x(tsOf(l)).toFixed(1)},${yi(l.iaf).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--water)" stroke-width="2.4" stroke-dasharray="6 3"/>`;
     pi.forEach(l=>g+=`<rect x="${x(tsOf(l))-4}" y="${yi(l.iaf)-4}" width="8" height="8" fill="var(--water)"/>`)}
   let lx=-99;ls.forEach(l=>{if(!l.estadio)return;const xs=x(tsOf(l));g+=`<line x1="${xs}" x2="${xs}" y1="${T-6}" y2="${H-B}" stroke="var(--crop)" stroke-width=".8" stroke-dasharray="2 3" opacity=".6"/>`;if(xs-lx>34){g+=`<text x="${xs}" y="${T-10}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--crop)">${esc(l.estadio)}</text>`;lx=xs}});
   g+=`<text x="${x(t0)}" y="${H-10}" font-size="11" fill="var(--muted)">${fl(t0)}</text>`+(ls.length>1?`<text x="${x(t1)}" y="${H-10}" font-size="11" fill="var(--muted)" text-anchor="end">${fl(t1)}</text>`:"");
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}">${g}</svg><div class="legend xs" style="gap:12px">${se.map(([,c,t])=>`<span><span style="display:inline-block;width:12px;height:3px;background:${c};vertical-align:middle"></span> ${t}</span>`).join("")}${ls.some(l=>l.iaf!=null)?`<span><span style="display:inline-block;width:12px;height:3px;background:var(--water);vertical-align:middle"></span> IAF (eje derecho, 1 a 10)</span>`:""}<span style="color:var(--crop);font-weight:700">V/R… = estadio</span></div><div class="xs">Malezas, verde y rastrojo: escala 1 a 5 (1 = nada, 5 = máximo). IAF = índice de área foliar, 1 a 10.</div>`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}">${g}</svg><div class="legend xs" style="gap:12px">${se.map(([,c,t])=>`<span><span style="display:inline-block;width:12px;height:3px;background:${c};vertical-align:middle"></span> ${t}</span>`).join("")}${ls.some(l=>l.iaf!=null)?`<span><span style="display:inline-block;width:12px;height:3px;background:var(--water);vertical-align:middle"></span> IAF (eje derecho, 0 a 10)</span>`:""}<span style="color:var(--crop);font-weight:700">V/R… = estadio</span></div><div class="xs">Malezas, verde y rastrojo: escala 1 a 5 (1 = nada, 5 = máximo). IAF = índice de área foliar, 0 a 10.</div>`;
 }
 function renderDetalle(){
   const p=pozoBy(st.detalle);if(!p){st.detalle=null;renderPozos();return}
@@ -712,12 +721,12 @@ $("btnYo").onclick=()=>{if(miPos&&MAP)MAP.setView([miPos.lat,miPos.lng],16);else
 
 /* ======= historial ======= */
 function renderHist(){
-  $("histFiltro").innerHTML=[["CP","Campo Plata"],["LST","LST"]].map(([id,n])=>`<button class="opt" style="text-align:center" aria-pressed="${st.hist===id}" data-c="${id}">${n}</button>`).join("");
+  $("histFiltro").innerHTML=[["T","Todos"],["CP","Campo Plata"],["LST","LST"]].map(([id,n])=>`<button class="opt" style="text-align:center" aria-pressed="${st.hist===id}" data-c="${id}">${n}</button>`).join("");
   $("histFiltro").querySelectorAll("button").forEach(b=>b.onclick=()=>{st.hist=b.dataset.c;renderHist()});
   const u=LS.get("ultimaSync",null);
   $("histInfo").innerHTML=`Sesión: <b>${esc(ses.nombre)}</b>${isAdmin()?" (administrador)":""} · ${cola.length} sin subir · Última sincronización: ${u?new Date(u).toLocaleString("es-AR"):"nunca"}`;
-  const ls=todas().filter(l=>l.campo===st.hist).sort((a,b)=>tsOf(b)-tsOf(a));
-  if(!ls.length){$("histList").innerHTML=`<div class="empty">Sin lecturas de ${st.hist==="CP"?"Campo Plata":"LST"} todavía.</div>`;return}
+  const ls=todas().filter(l=>st.hist==="T"||l.campo===st.hist).sort((a,b)=>tsOf(b)-tsOf(a));
+  if(!ls.length){$("histList").innerHTML=`<div class="empty">Sin lecturas${st.hist==="T"?"":" de "+(st.hist==="CP"?"Campo Plata":"LST")} todavía.</div>`;return}
   const by={};ls.forEach(l=>(by[l.fecha]=by[l.fecha]||[]).push(l));
   $("histList").innerHTML=Object.entries(by).map(([f,a])=>`<div class="panel"><h2>${new Date(f+"T12:00").toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"})}</h2><div class="tablewrap"><table><thead><tr><th>Pozo</th><th>Napa (m)</th><th>Lluvia</th><th>Estado</th><th>Cargó</th><th></th></tr></thead><tbody>${
    a.map(l=>`<tr><td style="font-family:var(--mono)">${esc(nomPozo(l.pozoId))}${l._local?" ⏳":""}</td><td class="n">${fmt(l.profundidad)}</td><td class="n">${l.lluvia??"–"}</td><td>${esc(l.cultivo?l.cultivo+" "+(l.estadio||""):(EST_TXT[l.estado]||l.estado||"–"))}</td><td>${esc(l.autor||"")}</td><td>${btnEd(l)}</td></tr>`).join("")}</tbody></table></div></div>`).join("");
@@ -725,7 +734,7 @@ function renderHist(){
 }
 $("btnSync").onclick=()=>sincronizar();
 $("btnCsv").onclick=()=>{
-  const head=["Fecha","Hora","Campo","Freatímetro","Código","Lote","Lectura vara (m)","Altura caño (m)","Ajuste boya (m)","Profundidad napa (m)","Lluvia (mm)","Estado","Malezas 1-5","Verde 1-5","Rastrojo 1-5","IAF 1-10","Forma de siembra","Cultivo","FS","DDS","Estadio","Observaciones","Cargó"];
+  const head=["Fecha","Hora","Campo","Freatímetro","Código","Lote","Lectura vara (m)","Altura caño (m)","Ajuste boya (m)","Profundidad napa (m)","Lluvia (mm)","Estado","Malezas 1-5","Verde 1-5","Rastrojo 1-5","IAF 0-10","Forma de siembra","Cultivo","FS","DDS","Estadio","Observaciones","Cargó"];
   const rows=todas().sort((a,b)=>tsOf(a)-tsOf(b)).map(l=>[fdate(l.fecha),l.hora,l.campo==="CP"?"Campo Plata":"LST",nomPozo(l.pozoId),l.pozoId,l.lote,l.lecturaVara,l.alturaCano,l.correccion,l.profundidad,l.lluvia??"",EST_TXT[l.estado]||l.estado||"",l.malezas??"",l.verde??"",l.cobertura??"",l.iaf??"",l.formaSiembra||"",l.cultivo||"",l.fs?fdate(l.fs):"",l.dds??"",l.estadio||"",l.obs||"",l.autor||""]);
   const csv="﻿"+[head,...rows].map(r=>r.map(v=>{v=String(v??"");return /[;"\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v}).join(";")).join("\n");
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=`freatimetros_${hoy()}.csv`;a.click();
@@ -733,7 +742,7 @@ $("btnCsv").onclick=()=>{
 
 /* ======= arranque ======= */
 $("fecha").value=hoy();$("hora").value=ahora();
-$("forma").innerHTML=`<option value="">Elegir…</option>`+FORMAS.map(f=>`<option>${f}</option>`).join("");$("iaf").innerHTML=`<option value="">Elegir 1 a 10…</option>`+[[1,"Inicio, recién emergido"],[2,""],[3,""],[4,""],[5,"Mitad del entresurco cubierto"],[6,""],[7,""],[8,""],[9,""],[10,"Cobertura completa"]].map(([v,t])=>`<option value="${v}">${v}${t?" – "+t:""}</option>`).join("");fillSel("malezas",MALEZAS);fillSel("verde",VERDE);fillSel("cob",COB);fillCultivoSelect();renderNet();boot();
+$("forma").innerHTML=`<option value="">Elegir…</option>`+FORMAS.map(f=>`<option>${f}</option>`).join("");$("iaf").innerHTML=`<option value="">Elegir 0 a 10…</option>`+[[0,"Sin hojas verdes: sin emerger o cultivo terminado"],[1,"Inicio, recién emergido"],[2,""],[3,""],[4,""],[5,"Mitad del entresurco cubierto"],[6,""],[7,""],[8,""],[9,""],[10,"Cobertura completa"]].map(([v,t])=>`<option value="${v}">${v}${t?" – "+t:""}</option>`).join("");fillSel("malezas",MALEZAS);fillSel("verde",VERDE);fillSel("cob",COB);fillCultivoSelect();renderNet();boot();
 
 </script>
 </body>
