@@ -50,6 +50,19 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute
 .pozos .opt.hoy{border-color:var(--ok)}.pozos .opt.hoy small{color:var(--ok)}
 .pozos .opt[aria-pressed="true"],#campoSeg .opt[aria-pressed="true"]{background:var(--sel);border-color:var(--sel);color:#fff;box-shadow:0 0 0 3px var(--brand)}
 .pozos .opt[aria-pressed="true"] small{color:#e3f0f8}
+.c-CP{--cc:#6d3fb0;--cc-soft:#efe7fa}.c-LST{--cc:#0b7f7a;--cc-soft:#dcf1ef}
+@media (prefers-color-scheme:dark){.c-CP{--cc:#b493e6;--cc-soft:#2b2240}.c-LST{--cc:#4fc2bb;--cc-soft:#15302e}}
+.cbar{border-top:6px solid var(--cc)!important}
+.ctag{display:inline-block;background:var(--cc);color:#fff;font-family:var(--font);font-weight:800;font-size:11px;padding:2px 8px;border-radius:6px;letter-spacing:.04em;vertical-align:middle;text-transform:uppercase}
+.cdot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--cc);margin-right:6px;vertical-align:middle}
+.seg .opt.c-CP,.seg .opt.c-LST{border-color:var(--cc);color:var(--cc);background:var(--cc-soft)}
+.seg .opt.c-CP[aria-pressed="true"],.seg .opt.c-LST[aria-pressed="true"]{background:var(--cc)!important;border-color:var(--cc)!important;color:#fff!important}
+.pozos .opt.c-CP,.pozos .opt.c-LST{border-color:var(--cc);background:var(--cc-soft);box-shadow:0 1px 0 var(--cc)}
+.pozos .opt.c-CP[aria-pressed="true"],.pozos .opt.c-LST[aria-pressed="true"]{background:var(--cc);border-color:var(--cc);color:#fff}
+.card.c-CP,.card.c-LST{border-left:8px solid var(--cc)}
+#paso1.c-CP,#paso1.c-LST{border-color:var(--cc);background:var(--cc-soft)}
+.selcard{border-left:12px solid var(--cc,var(--brand))}
+.pin-lbl.c-CP{background:#6d3fb0}.pin-lbl.c-LST{background:#0b7f7a}
 #paso1{border:2px solid var(--water);background:var(--water-soft)}
 #paso1 h2{color:var(--fg);font-size:15px}
 #campoSeg .opt{font-weight:800;font-size:16px;border:2px solid var(--optline)}
@@ -378,16 +391,17 @@ function renderGps(err){
 const lastOf=pid=>todas().filter(l=>l.pozoId===pid&&l.profundidad!=null).sort((a,b)=>tsOf(b)-tsOf(a))[0];
 function pozoList(c){return cfg.pozos.filter(p=>p.campo===c)}
 function renderForm(){
-  $("campoSeg").innerHTML=[["CP","Campo Plata"],["LST","LST"]].map(([id,n])=>`<button class="opt" style="text-align:center" aria-pressed="${st.campo===id}" data-c="${id}">${n}</button>`).join("");
+  $("campoSeg").innerHTML=[["CP","Campo Plata"],["LST","LST"]].map(([id,n])=>`<button class="opt c-${id}" style="text-align:center" aria-pressed="${st.campo===id}" data-c="${id}">${n}</button>`).join("");
   $("campoSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{st.campo=b.dataset.c;st.pozo=null;renderForm()});
   const list=pozoList(st.campo);
-  $("pozoGrid").innerHTML=list.length?list.map(p=>{const l=lastOf(p.id);const h=l&&l.fecha===hoy(),sel=st.pozo===p.id;return `<button class="opt${h?" hoy":""}" aria-pressed="${sel}" data-p="${p.id}">${esc(p.nombre)}<small>${sel?"✔ elegido":h?"✓ hoy":esc(p.lote||"")}</small></button>`}).join(""):`<div class="empty" style="grid-column:1/-1">${ses?"Sincronizá con señal para traer los pozos.":""}</div>`;
+  $("pozoGrid").innerHTML=list.length?list.map(p=>{const l=lastOf(p.id);const h=l&&l.fecha===hoy(),sel=st.pozo===p.id;return `<button class="opt c-${p.campo}${h?" hoy":""}" aria-pressed="${sel}" data-p="${p.id}">${esc(p.nombre)}<small>${sel?"✔ elegido":h?"✓ hoy":esc(p.lote||"")}</small></button>`}).join(""):`<div class="empty" style="grid-column:1/-1">${ses?"Sincronizá con señal para traer los pozos.":""}</div>`;
   $("pozoGrid").querySelectorAll("button").forEach(b=>b.onclick=()=>{st.pozo=b.dataset.p;if(!st.edit){st.estado=null;tomarGPS();const pc=precargar();renderForm();aplicarPrecarga(pc)}else renderForm();calc()});
   const p=pozoBy(st.pozo);
-  if(p){const l=lastOf(p.id);$("pozoInfo").innerHTML=`<div class="selcard"><b>📍 ${esc(p.nombre)}</b><span>${p.campo==="CP"?"Campo Plata":"LST"} · ${esc(loteTxt(p.lote,"sin asignar"))}`+(l&&!(st.edit&&l.id===st.edit.id)?` · Última: ${fmt(l.profundidad)} m el ${fdate(l.fecha)}`:"")+`</span></div>`}
+  if(p){const l=lastOf(p.id);$("pozoInfo").innerHTML=`<div class="selcard"><span><span class="ctag">${p.campo==="CP"?"Campo Plata":"LST · La Soledad"}</span></span><b>📍 ${esc(p.nombre)}</b><span>${p.campo==="CP"?"Campo Plata":"LST"} · ${esc(loteTxt(p.lote,"sin asignar"))}`+(l&&!(st.edit&&l.id===st.edit.id)?` · Última: ${fmt(l.profundidad)} m el ${fdate(l.fecha)}`:"")+`</span></div>`}
   else $("pozoInfo").innerHTML=`<div class="selhint">👆 Tocá el freatímetro que vas a medir</div>`;
-  $("t2").innerHTML="2 · Lectura de napa"+(p?` <span class="tag">${esc(p.nombre)}</span>`:"");
+  $("t2").innerHTML="2 · Lectura de napa"+(p?` <span class="tag c-${p.campo}" style="background:var(--cc);color:#fff">${esc(p.nombre)}</span>`:"");
   $("guardar").textContent=st.edit?"Guardar cambios":(p?"Guardar lectura de "+p.nombre:"Guardar lectura");
+  $("paso1").className="panel c-"+st.campo;document.querySelectorAll("#v-cargar>.panel:not(#paso1)").forEach(e=>{e.classList.remove("c-CP","c-LST","cbar");if(p)e.classList.add("c-"+p.campo,"cbar")});
   renderEdit();renderGps();renderEstado();$("guardar").disabled=!st.pozo;calc();renderAnt();
 }
 function renderEstado(){
@@ -582,14 +596,14 @@ function renderPozos(){
   if(st.detalle){renderDetalle();return}
   $("pozoDetalle").hidden=true;$("pozoCards").hidden=false;let h="";
   for(const [c,n] of [["CP","Campo Plata"],["LST","LST"]]){
-    h+=`<h2 style="margin-top:6px">${n}</h2>`;const list=pozoList(c);
+    h+=`<h2 style="margin-top:6px" class="c-${c}"><span class="ctag" style="font-size:13px">${n}</span></h2>`;const list=pozoList(c);
     const nuevo=isAdmin()?`<div id="nv-${c}"><button class="btn sec" data-nuevo="${c}">＋ Agregar freatímetro en ${n}</button></div>`:"";
     if(!list.length){h+=`<div class="empty">Sin pozos todavía.</div>`+nuevo;continue}
     for(const p of list){
       const ls=todas().filter(l=>l.pozoId===p.id&&l.profundidad!=null).sort((a,b)=>tsOf(b)-tsOf(a)),l=ls[0],pv=ls[1],z=l?zona(l.profundidad):null;
       let d="";if(l&&pv){const df=Math.round((l.profundidad-pv.profundidad)*100);d=df<0?`<span class="up">▲ subió ${-df} cm</span>`:df>0?`<span class="down">▼ bajó ${df} cm</span>`:"sin cambio"}
       const dd=l?Math.floor((Date.now()-tsOf(l))/864e5):null,cr=cropOf(p.id);
-      h+=`<button class="card" data-p="${p.id}"><div><div class="id">${esc(p.nombre)}${p.fijada?" 🔒":""}</div><div class="sub">${esc(loteTxt(p.lote))}</div></div>
+      h+=`<button class="card c-${p.campo}" data-p="${p.id}"><div><div class="id">${esc(p.nombre)}${p.fijada?" 🔒":""}</div><div class="sub">${esc(loteTxt(p.lote))}</div></div>
        <div>${z?`<span class="zone ${z.c}">${z.t}</span>`:`<span class="xs">Sin lecturas</span>`}${cr?`<div class="cr">${cr.tipo==="servicio"?"🌱 ":""}${esc(cr.cultivo)}${cr.fs?` · ${dias(cr.fs,hoy())} DDS`:""}</div>`:""}<div class="xs">${dd==null?"":dd===0?"Medido hoy":`Hace ${dd} día${dd>1?"s":""}`}</div>${spark(p.id)}</div>
        <div><div class="val">${l?fmt(l.profundidad)+" m":"–"}</div><div class="d">${d}</div></div></button>`}
     h+=nuevo;
@@ -650,7 +664,7 @@ function renderDetalle(){
   $("pozoCards").hidden=true;const box=$("pozoDetalle");box.hidden=false;
   const ls=todas().filter(l=>l.pozoId===p.id&&(l.profundidad!=null||l.lluvia!=null)).sort((a,b)=>tsOf(a)-tsOf(b)),cr=cropOf(p.id);
   let h=`<button class="link" id="volver">← Todos los pozos</button>
-   <div class="panel"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap"><h2 style="font-size:20px;color:var(--fg);font-family:var(--mono)">${esc(p.nombre)}</h2><span class="xs">${p.campo==="CP"?"Campo Plata":"LST"} · ${esc(loteTxt(p.lote))}</span></div>
+   <div class="panel c-${p.campo} cbar"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap"><h2 style="font-size:20px;color:var(--fg);font-family:var(--mono)">${esc(p.nombre)}</h2><span class="xs"><span class="ctag">${p.campo==="CP"?"Campo Plata":"LST"}</span> ${esc(loteTxt(p.lote))}</span></div>
    ${cr?`<div class="crop"><div>${cr.tipo==="servicio"?"🌱 Cultivo de servicio: ":""}<b>${esc(cr.cultivo)}</b>${cr.forma?" · "+esc(cr.forma):""}${cr.fs?` · FS ${fdate(cr.fs)}`:""}</div>${cr.fs?`<div style="font-family:var(--mono)">${dias(cr.fs,hoy())} DDS</div>`:""}</div>`:""}
    <h2>Napa y lluvia</h2>${chartNapa(ls,cr)}<h2>Estado del lote</h2>${chartEscalas(ls.filter(l=>l.profundidad!=null))}</div>`+fichaHtml(p);
   const rows=[...ls].reverse();
@@ -707,12 +721,12 @@ function distTxt(p){if(!miPos||p.lat==null)return"";const d=distM(miPos.lat,miPo
 function pararGPSMapa(){if(watchId!=null&&navigator.geolocation){navigator.geolocation.clearWatch(watchId);watchId=null}}
 function renderMapa(){
   if(!mapaCampo)mapaCampo=st.campo;
-  $("mapaSeg").innerHTML=[["CP","Campo Plata"],["LST","LST"]].map(([id,n])=>`<button class="opt" style="text-align:center;font-weight:800" aria-pressed="${mapaCampo===id}" data-c="${id}">${n}</button>`).join("");
+  $("mapaSeg").innerHTML=[["CP","Campo Plata"],["LST","LST"]].map(([id,n])=>`<button class="opt c-${id}" style="text-align:center;font-weight:800" aria-pressed="${mapaCampo===id}" data-c="${id}">${n}</button>`).join("");
   $("mapaSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{mapaCampo=b.dataset.c;renderMapa();encuadrar()});
   const list=pozoList(mapaCampo),con=list.filter(p=>p.lat!=null&&p.lng!=null),sin=list.filter(p=>p.lat==null||p.lng==null);
   // lista con distancia y "cómo llegar"
   const ult=pid=>lastOf(pid);iniciarGPSMapa();
-  $("mapaLista").innerHTML=con.map(p=>{const l=ult(p.id);return `<div class="card" style="grid-template-columns:auto 1fr auto;cursor:default">
+  $("mapaLista").innerHTML=con.map(p=>{const l=ult(p.id);return `<div class="card c-${p.campo}" style="grid-template-columns:auto 1fr auto;cursor:default">
      <span style="width:14px;height:14px;border-radius:50%;background:${colorZona(l&&l.profundidad)};display:inline-block"></span>
      <div><div class="id">${esc(p.nombre)}</div><div class="sub">${esc(loteTxt(p.lote))}${l?` · ${fmt(l.profundidad)} m (${fdate(l.fecha)})`:""}${distTxt(p)?` · a ${distTxt(p)}`:""}</div></div>
      <a class="navbtn" href="${navUrl(p.lat,p.lng)}" target="_blank" rel="noopener">🚗 Cómo llegar</a></div>`}).join("")
@@ -732,7 +746,7 @@ function renderMapa(){
   con.forEach(p=>{const l=ult(p.id);
     const ic=L.divIcon({className:"pin",html:`<div style="background:${colorZona(l&&l.profundidad)}"></div>`,iconSize:[22,22],iconAnchor:[11,11]});
     L.marker([p.lat,p.lng],{icon:ic}).addTo(capaPozos)
-     .bindTooltip(esc(p.nombre),{permanent:true,direction:"top",offset:[0,-12],className:"pin-lbl"})
+     .bindTooltip(esc(p.nombre),{permanent:true,direction:"top",offset:[0,-12],className:"pin-lbl c-"+p.campo})
      .bindPopup(`<div class="pop"><b>${esc(p.nombre)}</b><span>${esc(loteTxt(p.lote))}${l?`<br>Última: <b style="font-size:14px">${fmt(l.profundidad)} m</b> el ${fdate(l.fecha)}`:"<br>Sin lecturas"}${distTxt(p)?`<br>Estás a ${distTxt(p)}`:""}</span>
        <a href="${navUrl(p.lat,p.lng)}" target="_blank" rel="noopener">🚗 Cómo llegar (Google Maps)</a><button data-cargar="${esc(p.id)}">📝 Cargar lectura</button>${isAdmin()?`<button data-ubicar="${esc(p.id)}" style="background:var(--surface);color:var(--fg);border:1.5px solid var(--line)">📌 Corregir ubicación</button>`:""}</div>`)});
   setTimeout(()=>MAP.invalidateSize(),60);
@@ -775,7 +789,7 @@ $("btnYo").onclick=()=>{if(miPos&&MAP)MAP.setView([miPos.lat,miPos.lng],16);else
 
 /* ======= historial ======= */
 function renderHist(){
-  $("histFiltro").innerHTML=[["T","Todos"],["CP","Campo Plata"],["LST","LST"]].map(([id,n])=>`<button class="opt" style="text-align:center" aria-pressed="${st.hist===id}" data-c="${id}">${n}</button>`).join("");
+  $("histFiltro").innerHTML=[["T","Todos"],["CP","Campo Plata"],["LST","LST"]].map(([id,n])=>`<button class="opt${id==="T"?"":" c-"+id}" style="text-align:center" aria-pressed="${st.hist===id}" data-c="${id}">${n}</button>`).join("");
   $("histFiltro").querySelectorAll("button").forEach(b=>b.onclick=()=>{st.hist=b.dataset.c;renderHist()});
   const u=LS.get("ultimaSync",null);
   $("histInfo").innerHTML=`Sesión: <b>${esc(ses.nombre)}</b>${isAdmin()?" (administrador)":""} · ${cola.length} sin subir · Última sincronización: ${u?new Date(u).toLocaleString("es-AR"):"nunca"}`;
@@ -783,7 +797,7 @@ function renderHist(){
   if(!ls.length){$("histList").innerHTML=`<div class="empty">Sin lecturas${st.hist==="T"?"":" de "+(st.hist==="CP"?"Campo Plata":"LST")} todavía.</div>`;return}
   const by={};ls.forEach(l=>(by[l.fecha]=by[l.fecha]||[]).push(l));
   $("histList").innerHTML=Object.entries(by).map(([f,a])=>`<div class="panel"><h2>${new Date(f+"T12:00").toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"})}</h2><div class="tablewrap"><table><thead><tr><th>Pozo</th><th>Napa (m)</th><th>Lluvia</th><th>Estado</th><th>Cargó</th><th></th></tr></thead><tbody>${
-   a.map(l=>`<tr><td style="font-family:var(--mono)">${esc(nomPozo(l.pozoId))}${l._local?" ⏳":""}</td><td class="n">${fmt(l.profundidad)}</td><td class="n">${l.lluvia??"–"}</td><td>${esc(l.cultivo?l.cultivo+" "+(l.estadio||""):(EST_TXT[l.estado]||l.estado||"–"))}</td><td>${esc(l.autor||"")}</td><td>${btnEd(l)}</td></tr>`).join("")}</tbody></table></div></div>`).join("");
+   a.map(l=>`<tr><td style="font-family:var(--mono)" class="c-${l.campo}"><span class="cdot"></span>${esc(nomPozo(l.pozoId))}${l._local?" ⏳":""}</td><td class="n">${fmt(l.profundidad)}</td><td class="n">${l.lluvia??"–"}</td><td>${esc(l.cultivo?l.cultivo+" "+(l.estadio||""):(EST_TXT[l.estado]||l.estado||"–"))}</td><td>${esc(l.autor||"")}</td><td>${btnEd(l)}</td></tr>`).join("")}</tbody></table></div></div>`).join("");
   bindEd($("histList"));
 }
 $("btnSync").onclick=()=>sincronizar();
