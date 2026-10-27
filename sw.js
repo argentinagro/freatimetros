@@ -1,5 +1,5 @@
 // Guarda la app en el teléfono para que abra sin señal.
-const VERSION = 'freat-v3';
+const VERSION = 'freat-v4';
 const MAPAS = 'freat-mapas'; // librería del mapa y fotos satelitales ya vistas (se conserva entre versiones)
 const ARCHIVOS = ['./manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-180.png', './icons/logo-header.jpg'];
 const EXTERNOS = ['cdnjs.cloudflare.com', 'server.arcgisonline.com'];
@@ -21,6 +21,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
+  if (url.pathname.includes('prueba')) return; // la página de prueba va siempre directo a internet
   if (EXTERNOS.includes(url.hostname)) {
     // Mapa: primero lo guardado; si no está, se baja y se guarda para usarlo sin señal.
     e.respondWith(caches.open(MAPAS).then(c => c.match(e.request).then(g => g || fetch(e.request).then(r => { if (r.ok || r.type === 'opaque') c.put(e.request, r.clone()); return r; }))));
