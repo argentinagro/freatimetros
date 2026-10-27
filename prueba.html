@@ -80,6 +80,7 @@ input.num{font-family:var(--mono);font-size:24px}
 .msg.ok{background:var(--ok-soft);color:var(--ok)}.msg.err{background:var(--bad-soft);color:var(--bad)}.msg.info{background:var(--warn-soft);color:var(--warn)}
 .cards{display:grid;gap:8px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;grid-template-columns:70px 1fr auto;gap:10px;align-items:center;text-align:left;font:inherit;color:inherit;width:100%}
+.ant{display:block;margin-top:5px;padding:4px 9px;border-radius:9px;border:1px dashed var(--line);font-size:12px;font-weight:400;color:var(--muted)}.ant b{color:var(--fg)}.ant.alerta{border:1.5px solid var(--bad);color:var(--bad);background:var(--bad-soft)}.ant.alerta b{color:var(--bad)}
 .card .id{font-family:var(--mono);font-weight:700}.sub,.xs{font-size:12px;color:var(--muted)}
 .card .val{font-family:var(--mono);font-size:20px;font-weight:700;text-align:right}
 .card .d{font-size:12px;text-align:right}.cr{font-size:12px;color:var(--crop);font-weight:700}
@@ -156,12 +157,14 @@ td.n{font-family:var(--mono);text-align:right}
       <input class="num" id="lectura" type="number" inputmode="decimal" step="0.01" min="0" max="20" placeholder="0,00"></label>
     <div class="xs" id="alturaInfo"></div>
     <div class="result"><div><div class="xs">Profundidad real de napa</div><div class="big" id="prof">–</div></div><div id="profZone"></div></div>
+    <div class="ant" id="ant-napa" hidden></div>
     <label class="f">Lluvia desde la última lectura (mm)
       <span class="h">Pluviómetro del pozo. Vacío si no hay pluviómetro; 0 si no llovió</span>
       <input class="num" id="lluvia" type="number" inputmode="decimal" step="1" min="0" max="500" placeholder="–"></label>
   </div>
   <div class="panel">
     <h2>3 · Estado del lote</h2>
+    <div class="ant" id="ant-estado" hidden></div>
     <div id="cultivoActivo" class="crop" hidden></div>
     <div class="opts" id="estadoOpts"></div>
     <label class="f" id="formaWrap" hidden>Forma de siembra<select id="forma"></select></label>
@@ -178,11 +181,11 @@ td.n{font-family:var(--mono);text-align:right}
         <button class="btn sec" id="nc-save">Agregar a la lista</button><div id="nc-msg" hidden></div>
       </div>
     </details>
-    <label class="f" id="fenoWrap" hidden>Estadio fenológico<span class="h" id="fenoEscala"></span><select id="estadio"></select><div class="xs" id="corteH" hidden>✂️ Con <b>Corte</b> se da por terminado el cultivo de servicio: al guardar, el lote vuelve a barbecho.</div></label>
-    <label class="f" id="wIaf" hidden>IAF – índice de área foliar (0 a 10)<span class="h">Cuánto cubre el cultivo con hojas verdes: 0 = sin hojas verdes (recién sembrado sin emerger, o cultivo terminado: corte o madurez), 1 = recién emergido, 10 = cubre todo el entresurco</span><select id="iaf"></select></label>
-    <label class="f" id="wMal">Malezas<span class="h">Tamaño y cantidad de malezas vivas</span><select id="malezas"></select></label>
-    <label class="f" id="wVer">Verde activo<span class="h">Superficie verde transpirando (malezas o cultivo)</span><select id="verde"></select></label>
-    <label class="f" id="wCob">Cobertura de rastrojo<span class="h" id="cobH">Suelo tapado por residuos secos</span><select id="cob"></select></label>
+    <label class="f" id="fenoWrap" hidden>Estadio fenológico<span class="h" id="fenoEscala"></span><select id="estadio"></select><div class="ant" id="ant-estadio" hidden></div><div class="xs" id="corteH" hidden>✂️ Con <b>Corte</b> se da por terminado el cultivo de servicio: al guardar, el lote vuelve a barbecho.</div></label>
+    <label class="f" id="wIaf" hidden>IAF – índice de área foliar (0 a 10)<span class="h">Cuánto cubre el cultivo con hojas verdes: 0 = sin hojas verdes (recién sembrado sin emerger, o cultivo terminado: corte o madurez), 1 = recién emergido, 10 = cubre todo el entresurco</span><select id="iaf"></select><div class="ant" id="ant-iaf" hidden></div></label>
+    <label class="f" id="wMal">Malezas<span class="h">Tamaño y cantidad de malezas vivas</span><select id="malezas"></select><div class="ant" id="ant-malezas" hidden></div></label>
+    <label class="f" id="wVer">Verde activo<span class="h">Superficie verde transpirando (malezas o cultivo)</span><select id="verde"></select><div class="ant" id="ant-verde" hidden></div></label>
+    <label class="f" id="wCob">Cobertura de rastrojo<span class="h" id="cobH">Suelo tapado por residuos secos</span><select id="cob"></select><div class="ant" id="ant-cob" hidden></div></label>
     <label class="f">Observaciones<textarea id="obs" rows="2" placeholder="Ej.: caño dañado, agua turbia, bajo anegado"></textarea></label>
   </div>
   <div id="formMsg" hidden></div>
@@ -386,7 +389,7 @@ function renderForm(){
   else $("pozoInfo").innerHTML=`<div class="selhint">👆 Tocá el freatímetro que vas a medir</div>`;
   $("t2").innerHTML="2 · Lectura de napa"+(p?` <span class="tag">${esc(p.nombre)}</span>`:"");
   $("guardar").textContent=st.edit?"Guardar cambios":(p?"Guardar lectura de "+p.nombre:"Guardar lectura");
-  renderEdit();renderGps();renderEstado();$("guardar").disabled=!st.pozo;calc();
+  renderEdit();renderGps();renderEstado();$("guardar").disabled=!st.pozo;calc();renderAnt();
 }
 function renderEstado(){
   const crop=st.pozo&&!st.edit?cropOf(st.pozo):null,box=$("cultivoActivo");
@@ -430,13 +433,39 @@ function visibles(){
   const cc=conCult();$("wMal").hidden=cc;$("wVer").hidden=cc;$("wIaf").hidden=!cc;
   $("wCob").hidden=!cobVisible();$("cobH").textContent=cc?"Suelo tapado por residuos secos (se carga hasta la mitad de la etapa vegetativa)":"Suelo tapado por residuos secos";
 }
+function prevOf(pid){if(!pid)return null;const ed=st.edit,lim=ed?tsOf(todas().find(x=>x.id===ed.id)||{fecha:ed.fecha,hora:ed.hora}):Infinity;
+  return todas().filter(l=>l.pozoId===pid&&l.profundidad!=null&&(!ed||l.id!==ed.id)&&tsOf(l)<lim).sort((a,b)=>tsOf(b)-tsOf(a))[0]||null}
+function lluviaDesde(pid,prev){if(!prev)return 0;const t0=tsOf(prev),ed=st.edit;return todas().filter(l=>l.pozoId===pid&&tsOf(l)>t0&&(!ed||l.id!==ed.id)&&l.lluvia).reduce((s,l)=>s+Number(l.lluvia),0)+(Number($("lluvia").value)||0)}
+function anomalia(prof){
+  const p=pozoBy(st.pozo);if(!p||prof==null||isNaN(prof))return null;
+  if(p.profTotal!=null&&prof>Number(p.profTotal)+0.05)return `La napa da ${fmt(prof)} m y el caño mide ${fmt(p.profTotal)} m: revisá la lectura de la vara.`;
+  const pv=prevOf(p.id);if(!pv)return null;
+  const d=Math.round((prof-pv.profundidad)*100),mm=lluviaDesde(p.id,pv);
+  if(Math.abs(d)>=50)return `Cambió ${Math.abs(d)} cm desde la última lectura (${fmt(pv.profundidad)} m el ${fdate(pv.fecha)}). Es mucho: revisá la vara.`;
+  if(d<=-20&&mm<20)return `Subió ${-d} cm desde el ${fdate(pv.fecha)} con solo ${mm} mm de lluvia. Revisá la lectura.`;
+  return null}
+function renderAnt(){
+  const ids=["napa","estado","estadio","iaf","malezas","verde","cob"];ids.forEach(k=>$("ant-"+k).hidden=true);
+  const pv=prevOf(st.pozo);if(!pv)return;
+  const quien=`${fdate(pv.fecha)}${pv.autor?" · "+esc(pv.autor.split(" ")[0]):""}`,lab=(arr,v)=>{const x=arr.find(a=>a[0]==v);return x?v+" – "+esc(x[1]):v};
+  const set=(k,h)=>{const e=$("ant-"+k);e.innerHTML=`↩️ Última (${quien}): ${h}`;e.hidden=false};
+  const prof=calc();
+  set("napa",`<b>${fmt(pv.profundidad)} m</b> (vara ${fmt(pv.lecturaVara)})`+(prof!=null?` · ${(()=>{const d=Math.round((prof-pv.profundidad)*100);return d<0?"▲ subió "+(-d)+" cm":d>0?"▼ bajó "+d+" cm":"sin cambio"})()}`:""));
+  const an=anomalia(prof),en=$("ant-napa");en.classList.toggle("alerta",!!an);if(an)en.innerHTML+=`<br>⚠️ ${an}`;
+  set("estado",`<b>${esc(pv.cultivo?pv.cultivo+(pv.estadio?" "+pv.estadio:""):(EST_TXT[pv.estado]||pv.estado||"–"))}</b>`);
+  if(pv.estadio)set("estadio",`<b>${esc(pv.estadio)}</b>`);
+  if(pv.iaf!=null)set("iaf",`<b>${pv.iaf}</b>`);
+  if(pv.malezas!=null)set("malezas",`<b>${lab(MALEZAS,pv.malezas)}</b>`);
+  if(pv.verde!=null)set("verde",`<b>${lab(VERDE,pv.verde)}</b>`);
+  if(pv.cobertura!=null)set("cob",`<b>${lab(COB,pv.cobertura)}</b>`);
+}
 function calc(){
   const p=pozoBy(st.pozo),a=p&&p.alturaCano!=null?Number(p.alturaCano):0,corr=p&&p.correccion?Number(p.correccion):0,l=parseFloat($("lectura").value);
   $("alturaInfo").innerHTML=!p?"":p.alturaCano!=null?`Altura fija del caño: <b>${fmt(a)} m</b>`+(corr?` · ajuste de boya: <b>${corr>0?"+":""}${fmt(corr)} m</b>`:"")+" (se aplican solos)":`<span class="danger">Falta la altura del caño de ${esc(p.nombre)} en su ficha. Por ahora se toma 0.</span>`;
   const r=isNaN(l)?null:Math.round((l-a+corr)*100)/100;
   $("prof").textContent=r==null?"–":fmt(r)+" m";const z=zona(r);$("profZone").innerHTML=z?`<span class="zone ${z.c}">${z.t}</span>`:"";return r;
 }
-$("lectura").addEventListener("input",calc);$("fecha").addEventListener("change",renderEstado);$("cultivo").addEventListener("change",()=>{fillFeno($("cultivo").value);visibles()});$("estadio").addEventListener("change",()=>{visibles();const crop=st.pozo&&!st.edit?cropOf(st.pozo):null,c=crop?crop.cultivo:$("cultivo").value,e=$("estadio").value;if(esFin(c,e)&&$("iaf").value==="")$("iaf").value="0";$("corteH").hidden=!(esCorte(e)&&!st.edit)});
+$("lectura").addEventListener("input",()=>{calc();renderAnt()});$("lluvia").addEventListener("input",renderAnt);$("fecha").addEventListener("change",renderEstado);$("cultivo").addEventListener("change",()=>{fillFeno($("cultivo").value);visibles()});$("estadio").addEventListener("change",()=>{visibles();const crop=st.pozo&&!st.edit?cropOf(st.pozo):null,c=crop?crop.cultivo:$("cultivo").value,e=$("estadio").value;if(esFin(c,e)&&$("iaf").value==="")$("iaf").value="0";$("corteH").hidden=!(esCorte(e)&&!st.edit)});
 
 $("guardar").onclick=()=>{
   const p=pozoBy(st.pozo),lect=parseFloat($("lectura").value);
@@ -447,6 +476,10 @@ $("guardar").onclick=()=>{
     if(dup&&st.dupOk!==dup.id){const m=$("formMsg");m.hidden=false;m.className="msg err";m.innerHTML=`${esc(p.nombre)} ya tiene una lectura con fecha ${fdate(fch)} (${fmt(dup.profundidad)} m). ¿Querés corregir esa en vez de cargar otra? <button class="ed" id="dupEd">✏️ Corregir esa</button> <button class="ed" id="dupOk">Cargar otra igual</button>`;
       $("dupEd").onclick=()=>editar(dup.id);$("dupOk").onclick=()=>{st.dupOk=dup.id;$("guardar").click()};return}}
   const prof=calc();if(prof<0){showMsg("formMsg","err","La profundidad da negativa: revisá la lectura de la vara.");return}
+  const anom=anomalia(prof);let verif="";
+  if(anom){const key=st.pozo+"|"+lect;if(st.anomOk!==key){const m=$("formMsg");m.hidden=false;m.className="msg err";m.innerHTML=`⚠️ ${anom} <button class="ed" id="anRev">Revisar</button> <button class="ed" id="anOk">Está bien, guardar</button>`;
+      $("anRev").onclick=()=>{m.hidden=true;$("lectura").focus()};$("anOk").onclick=()=>{st.anomOk=key;$("guardar").click()};return}
+    verif="[Dato fuera de lo común, verificado por "+ses.nombre+"]"}
   const fecha=$("fecha").value||hoy(),hora=$("hora").value||ahora(),ed=st.edit,crop=ed?null:cropOf(p.id);
   let cultivo=null,fs=null,abre=false;
   let tipo="",forma="";
@@ -460,14 +493,14 @@ $("guardar").onclick=()=>{
   const r={id:ed?ed.id:"L"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),pozoId:p.id,campo:p.campo,lote:p.lote||"",fecha,hora,
     lecturaVara:lect,alturaCano:p.alturaCano??0,correccion:p.correccion||0,profundidad:prof,lluvia:num("lluvia"),
     estado:st.estado||"",estadoTxt:EST_TXT[st.estado]||"",malezas:conCult()?null:num("malezas"),verde:conCult()?null:num("verde"),cobertura:$("wCob").hidden?null:num("cob"),iaf:conCult()?num("iaf"):null,
-    cultivo:cultivo||"",fs:fs||"",dds:fs?dias(fs,fecha):null,tipoCultivo:tipo,formaSiembra:forma,estadio,escalaFeno:esc2?esc2.escala:"",obs:$("obs").value.trim(),
+    cultivo:cultivo||"",fs:fs||"",dds:fs?dias(fs,fecha):null,tipoCultivo:tipo,formaSiembra:forma,estadio,escalaFeno:esc2?esc2.escala:"",obs:[$("obs").value.trim(),verif].filter(Boolean).join(" "),
     lat:ed?ed.lat:st.gps?Math.round(st.gps.lat*1e6)/1e6:null,lng:ed?ed.lng:st.gps?Math.round(st.gps.lng*1e6)/1e6:null,autor:ed?ed.autor:ses.nombre};
   if(abre)r.abreCultivo=true;
   const corte=!ed&&tipo==="servicio"&&esCorte(estadio);if(corte)r.cierraCultivo=true;
   const i=cola.findIndex(c=>c.id===r.id);
   if(ed){if(i>=0){const prev=cola[i];if(prev.edit)r.edit=true;if(prev.abreCultivo&&r.cultivo&&!prev.edit)r.abreCultivo=true;cola[i]=r}else{r.edit=true;cola.push(r)}}
   else cola.push(r);
-  LS.set("cola",cola);st.edit=null;st.dupOk=null;
+  LS.set("cola",cola);st.edit=null;st.dupOk=null;st.anomOk=null;
   if(corte){if(cfg.activos)delete cfg.activos[p.id];LS.set("cfg",cfg);LS.set("cierres",[...LS.get("cierres",[]).filter(x=>x.pozoId!==p.id),{pozoId:p.id,fecha}])}
   const m=$("formMsg");m.hidden=false;m.className="msg ok";
   m.innerHTML=`✓ ${ed?"Corregida":"Guardada"}: <b>${esc(p.nombre)}</b> · ${fmt(prof)} m${cultivo?` · ${esc(cultivo)} ${esc(estadio)}${r.dds!=null?` (${r.dds} DDS)`:""}`:""}${corte?" · ✂️ cultivo de servicio terminado, el lote vuelve a barbecho":""}. <button class="ed" id="reEdit">✏️ Editar</button>`;
