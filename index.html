@@ -281,6 +281,7 @@ async function sincronizar(){
       const r=await api("guardarLecturas",{lecturas:cola});
       if(r&&r.ok){const ok=new Set([...(r.guardadas||[]),...(r.rechazadas||[])]);cola=cola.filter(l=>!ok.has(l.id));LS.set("cola",cola);if((r.rechazadas||[]).length)showMsg("formMsg","err","Una corrección no se aplicó: solo puede editar quien cargó la lectura o el administrador.")}
     }
+    const del=LS.get("borrar",[]);if(del.length){const r=await api("eliminarLecturas",{ids:del});if(r&&r.ok){const hecho=new Set([...(r.eliminadas||[]),...(r.rechazadas||[])]);LS.set("borrar",LS.get("borrar",[]).filter(x=>!hecho.has(x)));if((r.rechazadas||[]).length)showMsg("formMsg","err","Una lectura no se borró: solo puede borrar quien la cargó o el administrador.")}}
     for(const ci of LS.get("cierres",[])){const r=await api("cerrarCultivo",ci);if(r&&r.ok)LS.set("cierres",LS.get("cierres",[]).filter(x=>x.pozoId!==ci.pozoId))}
     const c=await api("config");if(c&&c.ok)LS.get("cierres",[]).forEach(ci=>{delete c.activos[ci.pozoId]});if(c&&c.ok){cfg={pozos:c.pozos,cultivos:c.cultivos,activos:c.activos};LS.set("cfg",cfg)}
     const d=await api("datos");if(d&&d.ok){lecturas=d.lecturas;LS.set("lecturas",lecturas);LS.set("ultimaSync",Date.now())}
@@ -478,8 +479,17 @@ $("guardar").onclick=()=>{
 /* ======= editar una lectura ======= */
 const EST_ID={"Barbecho":"barbecho","Barbecho limpio":"barbecho","Barbecho con malezas":"barbecho","Barbecho seco":"barbecho","Cultivo de servicio":"servicio","Sembrado":"cultivo","Con cultivo":"cultivo",barbecho_limpio:"barbecho",barbecho_malezas:"barbecho",barbecho_seco:"barbecho"};
 const puedeEditar=l=>ses&&(isAdmin()||l.autor===ses.nombre);
-const btnEd=l=>puedeEditar(l)?`<button class="ed" data-ed="${esc(l.id)}">✏️ Editar</button>`:"";
-function bindEd(root){root.querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>editar(b.dataset.ed))}
+const btnEd=l=>puedeEditar(l)?`<span style="white-space:nowrap"><button class="ed" data-ed="${esc(l.id)}">✏️ Editar</button> <button class="ed" data-del="${esc(l.id)}">🗑️ Borrar</button></span>`:"";
+function bindEd(root){root.querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>editar(b.dataset.ed));
+  root.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{if(b.dataset.armed!=="1"){b.dataset.armed="1";b.textContent="¿Borrar? Tocá de nuevo";b.style.color="var(--bad)";setTimeout(()=>{if(b.isConnected){b.dataset.armed="";b.textContent="🗑️ Borrar";b.style.color=""}},4000);return}borrar(b.dataset.del)})}
+function borrar(id){
+  const l=todas().find(x=>x.id===id);if(!l||!puedeEditar(l))return;
+  const enServidor=lecturas.some(x=>x.id===id);
+  cola=cola.filter(c=>c.id!==id);LS.set("cola",cola);lecturas=lecturas.filter(x=>x.id!==id);LS.set("lecturas",lecturas);
+  if(enServidor)LS.set("borrar",[...new Set([...LS.get("borrar",[]),id])]);
+  if(st.edit&&st.edit.id===id){st.edit=null;st.pozo=null;st.estado=null;limpiarForm()}
+  renderAll();if(navigator.onLine)sincronizar();
+}
 function limpiarForm(){$("lectura").value="";$("lluvia").value="";$("obs").value="";["malezas","verde","cob","iaf","cultivo","estadio","fs","forma"].forEach(id=>$(id).value="");$("fecha").value=hoy();$("hora").value=ahora()}
 function editar(id){
   const l=todas().find(x=>x.id===id);if(!l)return;
@@ -518,7 +528,7 @@ $("nc-save").onclick=async()=>{
 function setView(v){st.view=v;if(v!=="mapa")pararGPSMapa();["cargar","pozos","mapa","hist"].forEach(x=>$("v-"+x).hidden=x!==v);document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.v===v));renderAll()}
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{if(b.dataset.v==="pozos")st.detalle=null;setView(b.dataset.v)});
 function renderAll(){if(!ses)return;if(st.view==="cargar")renderForm();if(st.view==="pozos")renderPozos();if(st.view==="hist")renderHist();if(st.view==="mapa")renderMapa()}
-const todas=()=>{const m=new Map(lecturas.map(l=>[l.id,l]));cola.forEach(c=>m.set(c.id,{...c,_local:true}));return [...m.values()]};
+const todas=()=>{const m=new Map(lecturas.map(l=>[l.id,l]));cola.forEach(c=>m.set(c.id,{...c,_local:true}));LS.get("borrar",[]).forEach(id=>m.delete(id));return [...m.values()]};
 
 function spark(pid){const ls=todas().filter(l=>l.pozoId===pid&&l.profundidad!=null).sort((a,b)=>tsOf(a)-tsOf(b)).slice(-10);if(ls.length<2)return"";
   const w=70,h=22,vs=ls.map(l=>l.profundidad),mn=Math.min(...vs),mx=Math.max(...vs),r=mx-mn||1;
