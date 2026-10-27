@@ -383,7 +383,7 @@ function renderForm(){
   $("campoSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{st.campo=b.dataset.c;st.pozo=null;renderForm()});
   const list=pozoList(st.campo);
   $("pozoGrid").innerHTML=list.length?list.map(p=>{const l=lastOf(p.id);const h=l&&l.fecha===hoy(),sel=st.pozo===p.id;return `<button class="opt${h?" hoy":""}" aria-pressed="${sel}" data-p="${p.id}">${esc(p.nombre)}<small>${sel?"✔ elegido":h?"✓ hoy":esc(p.lote||"")}</small></button>`}).join(""):`<div class="empty" style="grid-column:1/-1">${ses?"Sincronizá con señal para traer los pozos.":""}</div>`;
-  $("pozoGrid").querySelectorAll("button").forEach(b=>b.onclick=()=>{st.pozo=b.dataset.p;if(!st.edit){st.estado=null;tomarGPS()}renderForm();calc()});
+  $("pozoGrid").querySelectorAll("button").forEach(b=>b.onclick=()=>{st.pozo=b.dataset.p;if(!st.edit){st.estado=null;tomarGPS();const pc=precargar();renderForm();aplicarPrecarga(pc)}else renderForm();calc()});
   const p=pozoBy(st.pozo);
   if(p){const l=lastOf(p.id);$("pozoInfo").innerHTML=`<div class="selcard"><b>📍 ${esc(p.nombre)}</b><span>${p.campo==="CP"?"Campo Plata":"LST"} · ${esc(loteTxt(p.lote,"sin asignar"))}`+(l&&!(st.edit&&l.id===st.edit.id)?` · Última: ${fmt(l.profundidad)} m el ${fdate(l.fecha)}`:"")+`</span></div>`}
   else $("pozoInfo").innerHTML=`<div class="selhint">👆 Tocá el freatímetro que vas a medir</div>`;
@@ -445,19 +445,31 @@ function anomalia(prof){
   if(d<=-20&&mm<20)return `Subió ${-d} cm desde el ${fdate(pv.fecha)} con solo ${mm} mm de lluvia. Revisá la lectura.`;
   return null}
 function renderAnt(){
-  const ids=["napa","estado","estadio","iaf","malezas","verde","cob"];ids.forEach(k=>$("ant-"+k).hidden=true);
+  const ids=["napa","estado","estadio","iaf","malezas","verde","cob"];ids.forEach(k=>{$("ant-"+k).hidden=true;$("ant-"+k).classList.remove("alerta")});
   const pv=prevOf(st.pozo);if(!pv)return;
   const quien=`${fdate(pv.fecha)}${pv.autor?" · "+esc(pv.autor.split(" ")[0]):""}`,lab=(arr,v)=>{const x=arr.find(a=>a[0]==v);return x?v+" – "+esc(x[1]):v};
-  const set=(k,h)=>{const e=$("ant-"+k);e.innerHTML=`↩️ Última (${quien}): ${h}`;e.hidden=false};
+  const set=(k,h)=>{const e=$("ant-"+k);e.innerHTML=h;e.hidden=false};
   const prof=calc();
-  set("napa",`<b>${fmt(pv.profundidad)} m</b> (vara ${fmt(pv.lecturaVara)})`+(prof!=null?` · ${(()=>{const d=Math.round((prof-pv.profundidad)*100);return d<0?"▲ subió "+(-d)+" cm":d>0?"▼ bajó "+d+" cm":"sin cambio"})()}`:""));
+  set("napa",`↩️ Última (${quien}): <b>${fmt(pv.profundidad)} m</b> (vara ${fmt(pv.lecturaVara)})`+(prof!=null?` · ${(()=>{const d=Math.round((prof-pv.profundidad)*100);return d<0?"▲ subió "+(-d)+" cm":d>0?"▼ bajó "+d+" cm":"sin cambio"})()}`:""));
   const an=anomalia(prof),en=$("ant-napa");en.classList.toggle("alerta",!!an);if(an)en.innerHTML+=`<br>⚠️ ${an}`;
-  set("estado",`<b>${esc(pv.cultivo?pv.cultivo+(pv.estadio?" "+pv.estadio:""):(EST_TXT[pv.estado]||pv.estado||"–"))}</b>`);
-  if(pv.estadio)set("estadio",`<b>${esc(pv.estadio)}</b>`);
-  if(pv.iaf!=null)set("iaf",`<b>${pv.iaf}</b>`);
-  if(pv.malezas!=null)set("malezas",`<b>${lab(MALEZAS,pv.malezas)}</b>`);
-  if(pv.verde!=null)set("verde",`<b>${lab(VERDE,pv.verde)}</b>`);
-  if(pv.cobertura!=null)set("cob",`<b>${lab(COB,pv.cobertura)}</b>`);
+  if(!st.edit&&st.precarga===pv.id)set("estado",`📋 Precargado con la última carga (${quien}). Cambiá solo lo que sea distinto.`);
+  const dif=(k,id,v,txt)=>{if(v==null||v==="")return;if(String($(id).value)!==String(v))set(k,`Antes (${quien}): <b>${txt}</b>`)};
+  dif("estadio","estadio",pv.estadio,esc(pv.estadio||""));dif("iaf","iaf",pv.iaf,pv.iaf);
+  dif("malezas","malezas",pv.malezas,lab(MALEZAS,pv.malezas));dif("verde","verde",pv.verde,lab(VERDE,pv.verde));dif("cob","cob",pv.cobertura,lab(COB,pv.cobertura));
+}
+function precargar(){
+  ["malezas","verde","cob","iaf","estadio"].forEach(id=>$(id).value="");st.precarga=null;
+  const pv=prevOf(st.pozo);if(!pv)return null;st.precarga=pv.id;
+  const crop=cropOf(st.pozo),tx=String(pv.estado||"");
+  const prevId=Object.keys(EST_TXT).find(k=>EST_TXT[k]===tx&&["barbecho","servicio","cultivo"].includes(k))||(/servicio/i.test(tx)?"servicio":/barbecho/i.test(tx)?"barbecho":(pv.cultivo?"cultivo":null));
+  if(!crop&&prevId==="barbecho")st.estado="barbecho";
+  return {pv,crop,prevId,mismo:!!(crop&&pv.cultivo&&pv.cultivo===crop.cultivo)};
+}
+function aplicarPrecarga(pc){
+  if(!pc)return;const {pv,crop,prevId,mismo}=pc,v=(id,x)=>{if(x!=null&&x!==""&&[...$(id).options].some(o=>o.value===String(x)))$(id).value=String(x)};
+  if(!crop&&prevId==="barbecho"){v("malezas",pv.malezas);v("verde",pv.verde);v("cob",pv.cobertura)}
+  if(mismo){v("estadio",pv.estadio);v("iaf",pv.iaf);v("cob",pv.cobertura)}
+  visibles();renderAnt();
 }
 function calc(){
   const p=pozoBy(st.pozo),a=p&&p.alturaCano!=null?Number(p.alturaCano):0,corr=p&&p.correccion?Number(p.correccion):0,l=parseFloat($("lectura").value);
@@ -465,7 +477,7 @@ function calc(){
   const r=isNaN(l)?null:Math.round((l-a+corr)*100)/100;
   $("prof").textContent=r==null?"–":fmt(r)+" m";const z=zona(r);$("profZone").innerHTML=z?`<span class="zone ${z.c}">${z.t}</span>`:"";return r;
 }
-$("lectura").addEventListener("input",()=>{calc();renderAnt()});$("lluvia").addEventListener("input",renderAnt);$("fecha").addEventListener("change",renderEstado);$("cultivo").addEventListener("change",()=>{fillFeno($("cultivo").value);visibles()});$("estadio").addEventListener("change",()=>{visibles();const crop=st.pozo&&!st.edit?cropOf(st.pozo):null,c=crop?crop.cultivo:$("cultivo").value,e=$("estadio").value;if(esFin(c,e)&&$("iaf").value==="")$("iaf").value="0";$("corteH").hidden=!(esCorte(e)&&!st.edit)});
+$("lectura").addEventListener("input",()=>{calc();renderAnt()});$("lluvia").addEventListener("input",renderAnt);["malezas","verde","cob","iaf"].forEach(id=>$(id).addEventListener("change",renderAnt));$("fecha").addEventListener("change",renderEstado);$("cultivo").addEventListener("change",()=>{fillFeno($("cultivo").value);visibles()});$("estadio").addEventListener("change",()=>{visibles();renderAnt();const crop=st.pozo&&!st.edit?cropOf(st.pozo):null,c=crop?crop.cultivo:$("cultivo").value,e=$("estadio").value;if(esFin(c,e)&&$("iaf").value==="")$("iaf").value="0";$("corteH").hidden=!(esCorte(e)&&!st.edit)});
 
 $("guardar").onclick=()=>{
   const p=pozoBy(st.pozo),lect=parseFloat($("lectura").value);
