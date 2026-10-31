@@ -114,6 +114,30 @@ td.n{font-family:var(--mono);text-align:right}
 .pin div{width:22px;height:22px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px #000a,0 2px 6px #0008}
 .pin-lbl{background:#000c;color:#fff;border:0;box-shadow:none;font-family:var(--mono);font-weight:800;font-size:12px;padding:1px 5px}
 .pin-lbl::before{display:none}
+#informe{display:none}
+@media print{
+  @page{size:A4;margin:10mm}
+  body{padding:0!important;background:#fff!important;color:#222!important}
+  body>*:not(#informe){display:none!important}
+  #informe{display:block!important}
+}
+#informe{font-family:var(--font);color:#222;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:11px}
+#informe .ih{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#000;color:#fff;padding:10px 14px;border-radius:6px}
+#informe .ih img{height:40px}
+#informe .ih h1{margin:0;font-size:18px;text-align:right}
+#informe .ih .s{font-size:10px;color:#ccc;text-align:right}
+#informe .sec{margin-top:12px;break-inside:avoid}
+#informe .st{color:#fff;font-weight:800;font-size:13px;letter-spacing:.05em;text-transform:uppercase;padding:5px 10px;border-radius:5px;display:flex;justify-content:space-between}
+#informe .kp{display:flex;gap:5px;flex-wrap:wrap;margin:7px 0}
+#informe .kp span{padding:3px 8px;border-radius:10px;font-weight:700;font-size:10px}
+#informe table{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:4px}
+#informe th{background:#f1eee8;color:#555;text-align:left;padding:5px 5px;font-size:9.5px;border-bottom:1.5px solid #bbb}
+#informe td{padding:5px 5px;border-bottom:1px solid #ddd;vertical-align:top;white-space:normal}
+#informe td.n{font-family:var(--mono);text-align:right;font-weight:700;white-space:nowrap}
+#informe .zc{display:inline-block;padding:2px 6px;border-radius:8px;font-weight:700;font-size:9.5px;white-space:nowrap}
+#informe .gl{margin-top:12px;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:9.5px;color:#444;break-inside:avoid;display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
+#informe .gl b{color:#222}
+#informe .pie{margin-top:10px;font-size:9px;color:#777;display:flex;justify-content:space-between;border-top:1px solid #ddd;padding-top:5px}
 .leaflet-popup-content{margin:12px;font-family:var(--font)}
 .pop{display:grid;gap:6px;min-width:190px}
 .pop b{font-family:var(--mono);font-size:17px}
@@ -211,6 +235,7 @@ td.n{font-family:var(--mono);text-align:right}
     <span class="zone z-bad">&lt; 1 m anegamiento</span><span class="zone z-warn">1–1,5 alta</span>
     <span class="zone z-ok">1,5–2,5 óptima</span><span class="zone z-warn">2,5–3,5 aporte bajo</span><span class="zone z-dry">&gt; 3,5 sin aporte</span>
   </div>
+  <button class="btn sec" id="btnInforme2">📄 Informe PDF de la última medición</button>
   <div id="pozoCards" class="cards"></div>
   <div id="pozoDetalle" hidden></div>
 </section>
@@ -233,6 +258,7 @@ td.n{font-family:var(--mono);text-align:right}
   <div class="panel">
     <div id="histInfo" class="xs"></div>
     <button class="btn sec" id="btnSync">Actualizar ahora</button>
+    <button class="btn sec" id="btnInforme">📄 Informe PDF de la última medición</button>
     <button class="btn sec" id="btnCsv">Descargar copia (CSV)</button>
     <button class="link danger" id="btnSalir">Cerrar sesión en este teléfono</button>
   </div>
@@ -801,6 +827,50 @@ function renderHist(){
   bindEd($("histList"));
 }
 $("btnSync").onclick=()=>sincronizar();
+const ZC={"z-bad":["#f5dcd9","#b4372f"],"z-warn":["#f6ead2","#8a5a12"],"z-ok":["#e1f0e3","#2f7d3f"],"z-dry":["#e4e0d8","#555"]};
+const CCOL={CP:"#6d3fb0",LST:"#0b7f7a"};
+function estadoInforme(l){
+  const sc=(t,v)=>v!=null?`${t} ${v}`:null;
+  if(l.cultivo){const sv=String(l.estado||"").toLowerCase().includes("servicio");
+    return [(sv?"Cultivo de servicio: ":"")+"<b>"+esc(l.cultivo)+"</b>"+(l.estadio?" "+esc(l.estadio):""),l.dds!=null?l.dds+" DDS":null,sc("IAF",l.iaf),sc("Rastrojo",l.cobertura)].filter(Boolean).join(" · ")}
+  return ["<b>"+esc(EST_TXT[l.estado]||l.estado||"Sin dato")+"</b>",sc("Malezas",l.malezas),sc("Verde",l.verde),sc("Rastrojo",l.cobertura)].filter(Boolean).join(" · ")}
+function perfilSVG(rows,col){
+  const W=700,H=220,L=40,R=10,T=30,B=10,n=rows.length,mx=Math.max(4,Math.ceil(Math.max(...rows.map(r=>r.l?r.l.profundidad:0))));
+  const y=d=>T+d/mx*(H-T-B),cw=(W-L-R)/n;
+  let g="";[[0,1,"#f5dcd9"],[1,1.5,"#f6ead2"],[1.5,2.5,"#e1f0e3"],[2.5,3.5,"#f6ead2"],[3.5,mx,"#e4e0d8"]].forEach(([a,b,c])=>{if(a<mx)g+=`<rect x="${L}" y="${y(a)}" width="${W-L-R}" height="${y(Math.min(b,mx))-y(a)}" fill="${c}"/>`});
+  for(let d=0;d<=mx;d++)g+=`<line x1="${L}" x2="${W-R}" y1="${y(d)}" y2="${y(d)}" stroke="#bbb" stroke-width=".6"/><text x="${L-5}" y="${y(d)+4}" font-size="11" text-anchor="end" fill="#666">${d} m</text>`;
+  rows.forEach((r,i)=>{const cx=L+cw*i+cw/2;g+=`<text x="${cx}" y="${T-12}" font-size="11" font-weight="700" text-anchor="middle" fill="${col}">${esc(r.p.nombre)}</text>`;
+    if(!r.l)return;const d=r.l.profundidad;g+=`<rect x="${cx-7}" y="${y(0)}" width="14" height="${y(d)-y(0)}" fill="#c9b9a4" opacity=".8"/><rect x="${cx-7}" y="${y(d)}" width="14" height="${y(mx)-y(d)}" fill="#1f6f9e" opacity=".75"/><circle cx="${cx}" cy="${y(d)}" r="5" fill="#1f6f9e" stroke="#fff" stroke-width="1.5"/><text x="${cx+10}" y="${y(d)+4}" font-size="11" font-weight="700" fill="#123">${fmt(d)}</text>`});
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;margin-top:6px">${g}</svg><div style="font-size:9px;color:#666">Perfil: marrón = suelo hasta la napa · azul = agua (napa). Fondo: rango de la napa.</div>`}
+function informe(campos){
+  const sec=campos.map(c=>{const rows=pozoList(c).map(p=>{const ls=todas().filter(l=>l.pozoId===p.id&&l.profundidad!=null).sort((a,b)=>tsOf(b)-tsOf(a));return{p,l:ls[0],pv:ls[1]}});
+    if(!rows.length)return"";const col=CCOL[c],nombre=c==="CP"?"Campo Plata":"La Soledad de Tostado (LST)";
+    const cnt={};rows.forEach(r=>{if(r.l){const z=zona(r.l.profundidad);cnt[z.t]=(cnt[z.t]||0)+1}});
+    const kp=Object.entries(cnt).map(([t,n])=>{const z=zona(t==="Riesgo anegamiento"?0.5:t==="Napa alta"?1.2:t==="Rango óptimo"?2:t==="Aporte bajo"?3:4);return `<span style="background:${ZC[z.c][0]};color:${ZC[z.c][1]}">${t}: ${n} pozo${n>1?"s":""}</span>`}).join("");
+    const fechas=rows.filter(r=>r.l).map(r=>r.l.fecha).sort();const rango=fechas.length?(fechas[0]===fechas[fechas.length-1]?fdate(fechas[0]):fdate(fechas[0])+" al "+fdate(fechas[fechas.length-1])):"";
+    const tr=rows.map(r=>{if(!r.l)return `<tr><td><b>${esc(r.p.nombre)}</b></td><td>${esc(loteTxt(r.p.lote))}</td><td colspan="5" style="color:#888">Sin lecturas</td></tr>`;
+      const z=zona(r.l.profundidad),d=r.pv?Math.round((r.l.profundidad-r.pv.profundidad)*100):null;
+      const cam=d==null?"–":d<0?`▲ subió ${-d} cm`:d>0?`▼ bajó ${d} cm`:"sin cambio";
+      return `<tr><td><b style="color:${col}">${esc(r.p.nombre)}</b></td><td>${esc(loteTxt(r.p.lote))}</td><td style="white-space:nowrap">${fdate(r.l.fecha)}</td><td class="n">${fmt(r.l.profundidad)} m</td><td style="white-space:nowrap">${cam}</td><td><span class="zc" style="background:${ZC[z.c][0]};color:${ZC[z.c][1]}">${z.t}</span></td><td>${estadoInforme(r.l)}</td></tr>`}).join("");
+    return `<div class="sec"><div class="st" style="background:${col}"><span>${nombre}</span><span style="font-weight:600;text-transform:none">Última medición: ${rango}</span></div>
+      <div class="kp">${kp}</div>${perfilSVG(rows,col)}
+      <table><thead><tr><th>Freatímetro</th><th>Lote</th><th>Fecha</th><th style="text-align:right">Napa</th><th>Cambio vs. anterior</th><th>Rango</th><th>Estado del lote / cultivo</th></tr></thead><tbody>${tr}</tbody></table></div>`}).join("");
+  const d=new Date(),f=`${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+  const esc5=a=>a.map(([v,t])=>`${v} = ${esc(t)}`).join("; ");
+  $("informe").innerHTML=`<div class="ih"><img src="icons/logo-header.jpg" alt="Argentinagro"><div><h1>Informe de napa freática</h1><div class="s">Última medición de cada freatímetro · ${f} ${ahora()} · ${esc(ses?ses.nombre:"")}</div></div></div>${sec}
+    <div class="gl"><div><b>Napa:</b> profundidad del agua medida desde la superficie del suelo, en metros (m). Más chico = napa más cerca de la superficie.</div>
+    <div><b>Rangos:</b> &lt; 1 m riesgo de anegamiento · 1–1,5 m napa alta · 1,5–2,5 m rango óptimo (aporte de agua al cultivo) · 2,5–3,5 m aporte bajo · &gt; 3,5 m sin aporte.</div>
+    <div><b>Cambio vs. anterior:</b> ▲ subió = la napa se acercó a la superficie; ▼ bajó = se alejó.</div>
+    <div><b>DDS:</b> días desde la siembra. <b>Estadio:</b> V = vegetativo, R = reproductivo, Z = escala Zadoks (trigo y otras gramíneas), CORTE = cultivo de servicio secado.</div>
+    <div><b>Malezas (1 a 5):</b> ${esc5(MALEZAS)}.</div><div><b>Verde activo (1 a 5):</b> ${esc5(VERDE)}.</div>
+    <div><b>Rastrojo (1 a 5):</b> ${esc5(COB)}.</div><div><b>IAF (0 a 10):</b> índice de área foliar, cuánto cubre el cultivo con hojas verdes: 0 = sin hojas verdes, 10 = cobertura completa del entresurco.</div></div>
+    <div class="pie"><span>ARGENTINAGRO ASESORAMIENTO · Alfredo González – Ingeniero Agrónomo</span><span>Datos: app Freatímetros</span></div>`;
+  const t=document.title;document.title=`Informe napa ${campos.length>1?"CP y LST":campos[0]} ${f.replace(/\//g,"-")}`;
+  const fin=()=>{document.title=t;window.removeEventListener("afterprint",fin)};window.addEventListener("afterprint",fin);
+  const img=$("informe").querySelector("img");const go=()=>setTimeout(()=>window.print(),150);if(img.complete)go();else{img.onload=go;img.onerror=go}
+}
+$("btnInforme").onclick=()=>informe(st.hist==="T"?["CP","LST"]:[st.hist]);
+$("btnInforme2").onclick=()=>informe(["CP","LST"]);
 $("btnCsv").onclick=()=>{
   const head=["Fecha","Hora","Campo","Freatímetro","Código","Lote","Lectura vara (m)","Altura caño (m)","Ajuste boya (m)","Profundidad napa (m)","Lluvia (mm)","Estado","Malezas 1-5","Verde 1-5","Rastrojo 1-5","IAF 0-10","Forma de siembra","Cultivo","FS","DDS","Estadio","Observaciones","Cargó"];
   const rows=todas().sort((a,b)=>tsOf(a)-tsOf(b)).map(l=>[fdate(l.fecha),l.hora,l.campo==="CP"?"Campo Plata":"LST",nomPozo(l.pozoId),l.pozoId,l.lote,l.lecturaVara,l.alturaCano,l.correccion,l.profundidad,l.lluvia??"",EST_TXT[l.estado]||l.estado||"",l.malezas??"",l.verde??"",l.cobertura??"",l.iaf??"",l.formaSiembra||"",l.cultivo||"",l.fs?fdate(l.fs):"",l.dds??"",l.estadio||"",l.obs||"",l.autor||""]);
@@ -813,5 +883,6 @@ $("fecha").value=hoy();$("hora").value=ahora();
 $("forma").innerHTML=`<option value="">Elegir…</option>`+FORMAS.map(f=>`<option>${f}</option>`).join("");$("iaf").innerHTML=`<option value="">Elegir 0 a 10…</option>`+[[0,"Sin hojas verdes: sin emerger o cultivo terminado"],[1,"Inicio, recién emergido"],[2,""],[3,""],[4,""],[5,"Mitad del entresurco cubierto"],[6,""],[7,""],[8,""],[9,""],[10,"Cobertura completa"]].map(([v,t])=>`<option value="${v}">${v}${t?" – "+t:""}</option>`).join("");fillSel("malezas",MALEZAS);fillSel("verde",VERDE);fillSel("cob",COB);fillCultivoSelect();renderNet();boot();
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
+<div id="informe"></div>
 </body>
 </html>
