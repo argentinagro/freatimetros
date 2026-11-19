@@ -194,8 +194,9 @@ td.n{font-family:var(--mono);text-align:right}
     <div class="xs" id="alturaInfo"></div>
     <div class="result"><div><div class="xs">Profundidad real de napa</div><div class="big" id="prof">–</div></div><div id="profZone"></div></div>
     <div class="ant" id="ant-napa" hidden></div>
-    <label class="f">Lluvia desde la última lectura (mm)
-      <span class="h">Pluviómetro del pozo. Vacío si no hay pluviómetro; 0 si no llovió</span>
+    <div class="ant alerta" id="provBox" hidden></div>
+    <label class="f"><span id="lluviaLbl">Lluvia desde la última lectura (mm)</span>
+      <span class="h" id="lluviaH">Pluviómetro del pozo. Vacío si no hay pluviómetro; 0 si no llovió</span>
       <input class="num" id="lluvia" type="number" inputmode="decimal" step="1" min="0" max="500" placeholder="–"></label>
   </div>
   <div class="panel">
@@ -428,7 +429,7 @@ function renderForm(){
   $("t2").innerHTML="2 · Lectura de napa"+(p?` <span class="tag c-${p.campo}" style="background:var(--cc);color:#fff">${esc(p.nombre)}</span>`:"");
   $("guardar").textContent=st.edit?"Guardar cambios":(p?"Guardar lectura de "+p.nombre:"Guardar lectura");
   $("paso1").className="panel c-"+st.campo;document.querySelectorAll("#v-cargar>.panel:not(#paso1)").forEach(e=>{e.classList.remove("c-CP","c-LST","cbar");if(p)e.classList.add("c-"+p.campo,"cbar")});
-  renderEdit();renderGps();renderEstado();$("guardar").disabled=!st.pozo;calc();renderAnt();
+  renderEdit();renderGps();renderEstado();renderProv();$("guardar").disabled=!st.pozo;calc();renderAnt();
 }
 function renderEstado(){
   const crop=st.pozo&&!st.edit?cropOf(st.pozo):null,box=$("cultivoActivo");
@@ -474,7 +475,19 @@ function visibles(){
 }
 function prevOf(pid){if(!pid)return null;const ed=st.edit,lim=ed?tsOf(todas().find(x=>x.id===ed.id)||{fecha:ed.fecha,hora:ed.hora}):Infinity;
   return todas().filter(l=>l.pozoId===pid&&l.profundidad!=null&&(!ed||l.id!==ed.id)&&tsOf(l)<lim).sort((a,b)=>tsOf(b)-tsOf(a))[0]||null}
-function lluviaDesde(pid,prev){if(!prev)return 0;const t0=tsOf(prev),ed=st.edit;return todas().filter(l=>l.pozoId===pid&&tsOf(l)>t0&&(!ed||l.id!==ed.id)&&l.lluvia).reduce((s,l)=>s+Number(l.lluvia),0)+(Number($("lluvia").value)||0)}
+/* lluvias provisorias (cargadas a mano por zona) pendientes de corregir con el pluviómetro del pozo */
+function provDe(pid){if(!pid||st.edit)return[];const pv=prevOf(pid),t0=pv?tsOf(pv):-Infinity;
+  return todas().filter(l=>l.pozoId===pid&&l.profundidad==null&&l.lluvia!=null&&l.lluvia!==""&&/PROVISORIO/i.test(l.obs||"")&&tsOf(l)>t0).sort((a,b)=>tsOf(a)-tsOf(b))}
+function renderProv(){
+  const b=$("provBox"),pr=provDe(st.pozo);
+  if(!pr.length){b.hidden=true;$("lluviaLbl").textContent="Lluvia desde la última lectura (mm)";$("lluviaH").textContent="Pluviómetro del pozo. Vacío si no hay pluviómetro; 0 si no llovió";return}
+  b.hidden=false;
+  b.innerHTML=`🌧️ <b>Ya hay lluvia cargada como provisoria</b> para este pozo: `+pr.map(l=>`<b>${fdate(l.fecha)}: ${esc(String(l.lluvia))} mm</b>`).join(", ")+
+    `. Poné abajo lo que marca el pluviómetro: <b>reemplaza ese dato y se guarda en la fecha de la lluvia</b>, no en la de hoy. Si lo dejás vacío, queda el provisorio.`;
+  $("lluviaLbl").textContent="Lo que marca el pluviómetro (mm)";
+  $("lluviaH").textContent=pr.length>1?"Total juntado desde la última lectura: se reparte entre esas lluvias":"Corrige la lluvia del "+fdate(pr[0].fecha);
+}
+function lluviaDesde(pid,prev){if(!prev)return 0;const t0=tsOf(prev),ed=st.edit;const pr=$("lluvia").value!==""?new Set(provDe(pid).map(x=>x.id)):new Set();return todas().filter(l=>l.pozoId===pid&&tsOf(l)>t0&&(!ed||l.id!==ed.id)&&l.lluvia&&!pr.has(l.id)).reduce((s,l)=>s+Number(l.lluvia),0)+(Number($("lluvia").value)||0)}
 function anomalia(prof){
   const p=pozoBy(st.pozo);if(!p||prof==null||isNaN(prof))return null;
   if(p.profTotal!=null&&prof>Number(p.profTotal)+0.05)return `La napa da ${fmt(prof)} m y el caño mide ${fmt(p.profTotal)} m: revisá la lectura de la vara.`;
@@ -547,6 +560,14 @@ $("guardar").onclick=()=>{
     cultivo:cultivo||"",fs:fs||"",dds:fs?dias(fs,fecha):null,tipoCultivo:tipo,formaSiembra:forma,estadio,escalaFeno:esc2?esc2.escala:"",obs:[$("obs").value.trim(),verif].filter(Boolean).join(" "),
     lat:ed?ed.lat:st.gps?Math.round(st.gps.lat*1e6)/1e6:null,lng:ed?ed.lng:st.gps?Math.round(st.gps.lng*1e6)/1e6:null,autor:ed?ed.autor:ses.nombre};
   if(abre)r.abreCultivo=true;
+  const provs=ed?[]:provDe(p.id);let provTxt="";
+  if(provs.length){const tot=r.lluvia;r.lluvia=null;
+    if(tot!=null){const sp=provs.reduce((s,x)=>s+Number(x.lluvia||0),0);let rest=tot;
+      provs.forEach((x,k)=>{const v=k===provs.length-1?rest:Math.round(sp?tot*Number(x.lluvia||0)/sp:tot/provs.length);rest-=v;
+        const e={...x,lluvia:v,obs:`Lluvia ${fdate(x.fecha)} del pluviómetro del freatímetro (${ses.nombre}, leída ${fdate(fecha)}). Reemplaza provisorio ${x.lluvia} mm`+(provs.length>1?` (total ${tot} mm repartido entre ${provs.length} lluvias)`:""),edit:true};
+        delete e._local;const j=cola.findIndex(c=>c.id===e.id);if(j>=0)cola[j]=e;else cola.push(e);
+        const li=lecturas.findIndex(z=>z.id===e.id);if(li>=0)lecturas[li]={...lecturas[li],lluvia:v,obs:e.obs};});
+      LS.set("lecturas",lecturas);provTxt=` · 🌧️ ${tot} mm guardados en la lluvia del ${provs.map(x=>fdate(x.fecha)).join(" y ")}`}}
   const corte=!ed&&tipo==="servicio"&&esCorte(estadio);if(corte)r.cierraCultivo=true;
   const i=cola.findIndex(c=>c.id===r.id);
   if(ed){if(i>=0){const prev=cola[i];if(prev.edit)r.edit=true;if(prev.abreCultivo&&r.cultivo&&!prev.edit)r.abreCultivo=true;cola[i]=r}else{r.edit=true;cola.push(r)}}
@@ -554,7 +575,7 @@ $("guardar").onclick=()=>{
   LS.set("cola",cola);st.edit=null;st.dupOk=null;st.anomOk=null;
   if(corte){if(cfg.activos)delete cfg.activos[p.id];LS.set("cfg",cfg);LS.set("cierres",[...LS.get("cierres",[]).filter(x=>x.pozoId!==p.id),{pozoId:p.id,fecha}])}
   const m=$("formMsg");m.hidden=false;m.className="msg ok";
-  m.innerHTML=`✓ ${ed?"Corregida":"Guardada"}: <b>${esc(p.nombre)}</b> · ${fmt(prof)} m${cultivo?` · ${esc(cultivo)} ${esc(estadio)}${r.dds!=null?` (${r.dds} DDS)`:""}`:""}${corte?" · ✂️ cultivo de servicio terminado, el lote vuelve a barbecho":""}. <button class="ed" id="reEdit">✏️ Editar</button>`;
+  m.innerHTML=`✓ ${ed?"Corregida":"Guardada"}: <b>${esc(p.nombre)}</b> · ${fmt(prof)} m${cultivo?` · ${esc(cultivo)} ${esc(estadio)}${r.dds!=null?` (${r.dds} DDS)`:""}`:""}${corte?" · ✂️ cultivo de servicio terminado, el lote vuelve a barbecho":""}${provTxt}. <button class="ed" id="reEdit">✏️ Editar</button>`;
   $("reEdit").onclick=()=>editar(r.id);
   $("lectura").value="";$("lluvia").value="";$("obs").value="";["malezas","verde","cob","iaf","cultivo","estadio","fs","forma"].forEach(id=>$(id).value="");
   st.pozo=null;st.estado=null;st.gps=null;$("hora").value=ahora();renderForm();renderNet();window.scrollTo({top:0,behavior:"smooth"});
